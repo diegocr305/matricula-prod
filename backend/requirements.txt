@@ -6,5 +6,6 @@ passlib[bcrypt]
 bcrypt
 python-dotenv
 google-auth
+requests
 pandas
 reportlab
