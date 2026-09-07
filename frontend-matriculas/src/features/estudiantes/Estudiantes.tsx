@@ -14,6 +14,7 @@ export default function Estudiantes() {
     cargandoLista, estudiantesFiltrados,
     verFichaEstudiante,
     datosEdicion, setDatosEdicion,
+    buscarApoderadoPorRut, buscandoApoderado, avisoApoderado,
     estudianteCreadoExito, rutRecienCreado, cerrarModalExito, irAMatricular,
     nuevoEstudiante, setNuevoEstudiante, formatearRUT, handleCrearEstudiante,
     creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion
@@ -173,7 +174,12 @@ export default function Estudiantes() {
                   <>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">RUT Apoderado</p>
-                      <input type="text" placeholder="12345678-9" value={datosEdicion.rut_apoderado} onChange={(e) => setDatosEdicion({...datosEdicion, rut_apoderado: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                      <div className="flex gap-2">
+                        <input type="text" placeholder="12345678-9" value={datosEdicion.rut_apoderado} onChange={(e) => setDatosEdicion({...datosEdicion, rut_apoderado: e.target.value})} className="flex-1 border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                        <button type="button" onClick={buscarApoderadoPorRut} disabled={buscandoApoderado} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded disabled:opacity-50 whitespace-nowrap">
+                          {buscandoApoderado ? 'Buscando...' : 'Buscar'}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Nombres</p>
@@ -206,6 +212,11 @@ export default function Estudiantes() {
                   )}
                 </div>
               </div>
+              {modoEdicion && avisoApoderado && (
+                <div className="mt-4 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3">
+                  {avisoApoderado}
+                </div>
+              )}
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">

@@ -139,42 +139,131 @@ def crear_estudiante_db(payload: dict):
         cur.close()
         conn.close()
 
+def buscar_apoderado_por_rut_db(rut_apoderado: str):
+    """Busca un apoderado por RUT/pasaporte. Devuelve sus datos y cuántos estudiantes tiene asociados."""
+    rut_apoderado = (rut_apoderado or "").strip()
+    if not rut_apoderado:
+        raise HTTPException(status_code=400, detail="Debe indicar un RUT para buscar.")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT a.id_apoderado, a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno,
+                   a.domicilio, a.telefono, a.correo_electronico,
+                   (SELECT count(*) FROM estudiante e WHERE e.id_apoderado_principal = a.id_apoderado) AS n_estudiantes
+            FROM apoderado a
+            WHERE a.rut_pasaporte = %s
+            """,
+            (rut_apoderado,),
+        )
+        fila = cur.fetchone()
+        if not fila:
+            return {"existe": False}
+        return {
+            "existe": True,
+            "id_apoderado": fila[0],
+            "rut_apoderado": fila[1],
+            "nombres_apoderado": fila[2] or "",
+            "apellido_paterno_apoderado": fila[3] or "",
+            "apellido_materno_apoderado": fila[4] or "",
+            "domicilio_apoderado": fila[5] or "",
+            "telefono_apoderado": fila[6] or "",
+            "correo_apoderado": fila[7] or "",
+            "n_estudiantes": fila[8],
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
 def actualizar_datos_estudiante_db(rut: str, req):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE estudiante SET domicilio = %s WHERE run_ipe = %s RETURNING id_apoderado_principal", 
-                    (req.domicilio_estudiante, rut))
+        # 1. Domicilio del estudiante
+        cur.execute(
+            "UPDATE estudiante SET domicilio = %s WHERE run_ipe = %s RETURNING id_apoderado_principal",
+            (req.domicilio_estudiante, rut),
+        )
         resultado = cur.fetchone()
-        
         if not resultado:
             raise HTTPException(status_code=404, detail="Estudiante no encontrado")
-            
-        id_apoderado = resultado[0]
-        
-        if id_apoderado:
-            cur.execute("""
-                UPDATE apoderado 
-                SET rut_pasaporte = %s, nombres = %s, apellido_paterno = %s, apellido_materno = %s, 
-                    domicilio = %s, telefono = %s, correo_electronico = %s 
-                WHERE id_apoderado = %s
-            """, (req.rut_apoderado, req.nombres_apoderado, req.apellido_paterno_apoderado, 
-                  req.apellido_materno_apoderado, req.domicilio_apoderado, req.telefono_apoderado, 
-                  req.correo_apoderado, id_apoderado))
+        id_apoderado_actual = resultado[0]
+
+        rut_nuevo = (req.rut_apoderado or "").strip()
+
+        # Si no se envió RUT de apoderado, no tocamos el apoderado.
+        if not rut_nuevo:
+            conn.commit()
+            return {"mensaje": "Datos actualizados exitosamente"}
+
+        # 2. ¿Existe ya un apoderado con ese RUT?
+        cur.execute("SELECT id_apoderado FROM apoderado WHERE rut_pasaporte = %s", (rut_nuevo,))
+        apod_existente = cur.fetchone()
+
+        if apod_existente:
+            id_apod_existente = apod_existente[0]
+            if id_apoderado_actual == id_apod_existente:
+                # Es el mismo apoderado ya vinculado -> edición normal (actualizamos sus datos).
+                cur.execute(
+                    """
+                    UPDATE apoderado
+                    SET nombres = %s, apellido_paterno = %s, apellido_materno = %s,
+                        domicilio = %s, telefono = %s, correo_electronico = %s
+                    WHERE id_apoderado = %s
+                    """,
+                    (req.nombres_apoderado, req.apellido_paterno_apoderado, req.apellido_materno_apoderado,
+                     req.domicilio_apoderado, req.telefono_apoderado, req.correo_apoderado, id_apod_existente),
+                )
+                mensaje = "Datos del apoderado actualizados."
+            else:
+                # OPCIÓN 1: el RUT existe y pertenece a OTRO apoderado -> solo vinculamos,
+                # NO sobreescribimos sus datos (son compartidos con otros estudiantes).
+                cur.execute(
+                    "UPDATE estudiante SET id_apoderado_principal = %s WHERE run_ipe = %s",
+                    (id_apod_existente, rut),
+                )
+                mensaje = "Estudiante vinculado al apoderado existente."
         else:
-            cur.execute("""
-                INSERT INTO apoderado (rut_pasaporte, nombres, apellido_paterno, apellido_materno, domicilio, telefono, correo_electronico)
-                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id_apoderado
-            """, (req.rut_apoderado, req.nombres_apoderado, req.apellido_paterno_apoderado, 
-                  req.apellido_materno_apoderado, req.domicilio_apoderado, req.telefono_apoderado, req.correo_apoderado))
-            
-            nuevo_id_apoderado = cur.fetchone()[0]
-            
-            cur.execute("UPDATE estudiante SET id_apoderado_principal = %s WHERE run_ipe = %s", 
-                        (nuevo_id_apoderado, rut))
-        
+            # No existe ese RUT.
+            if id_apoderado_actual:
+                # El estudiante tenía un apoderado (con otro RUT): actualizamos ese registro
+                # (equivale a corregirle el RUT y datos al apoderado actual).
+                cur.execute(
+                    """
+                    UPDATE apoderado
+                    SET rut_pasaporte = %s, nombres = %s, apellido_paterno = %s, apellido_materno = %s,
+                        domicilio = %s, telefono = %s, correo_electronico = %s
+                    WHERE id_apoderado = %s
+                    """,
+                    (rut_nuevo, req.nombres_apoderado, req.apellido_paterno_apoderado, req.apellido_materno_apoderado,
+                     req.domicilio_apoderado, req.telefono_apoderado, req.correo_apoderado, id_apoderado_actual),
+                )
+                mensaje = "Datos del apoderado actualizados."
+            else:
+                # El estudiante no tenía apoderado: creamos uno y vinculamos.
+                cur.execute(
+                    """
+                    INSERT INTO apoderado (rut_pasaporte, nombres, apellido_paterno, apellido_materno, domicilio, telefono, correo_electronico)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id_apoderado
+                    """,
+                    (rut_nuevo, req.nombres_apoderado, req.apellido_paterno_apoderado, req.apellido_materno_apoderado,
+                     req.domicilio_apoderado, req.telefono_apoderado, req.correo_apoderado),
+                )
+                nuevo_id = cur.fetchone()[0]
+                cur.execute(
+                    "UPDATE estudiante SET id_apoderado_principal = %s WHERE run_ipe = %s",
+                    (nuevo_id, rut),
+                )
+                mensaje = "Apoderado creado y vinculado."
+
         conn.commit()
-        return {"mensaje": "Datos actualizados exitosamente"}
+        return {"mensaje": mensaje}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         print(f"Error BD: {e}")

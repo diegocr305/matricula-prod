@@ -85,6 +85,8 @@ export const useEstudiantes = () => {
 
   const [modoEdicion, setModoEdicion] = useState(false);
   const [datosEdicion, setDatosEdicion] = useState<any>({});
+  const [avisoApoderado, setAvisoApoderado] = useState<string>('');
+  const [buscandoApoderado, setBuscandoApoderado] = useState(false);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
   
@@ -165,7 +167,8 @@ export const useEstudiantes = () => {
   const verFichaEstudiante = async (rut: string) => {
     setCargandoFicha(true);
     setError('');
-    setModoEdicion(false); 
+    setModoEdicion(false);
+    setAvisoApoderado(''); 
     const token = localStorage.getItem('token');
     
     try {
@@ -191,6 +194,49 @@ export const useEstudiantes = () => {
       setError(err.message);
     } finally {
       setCargandoFicha(false);
+    }
+  };
+
+  const buscarApoderadoPorRut = async () => {
+    const rutApod = (datosEdicion.rut_apoderado || '').trim();
+    setAvisoApoderado('');
+    if (!rutApod) {
+      alert('Ingresa un RUT de apoderado para buscar.');
+      return;
+    }
+    setBuscandoApoderado(true);
+    const token = localStorage.getItem('token');
+    try {
+      const respuesta = await fetch(`${API_URL}/estudiante/apoderado/buscar/${encodeURIComponent(rutApod)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!respuesta.ok) throw new Error('Error al buscar el apoderado');
+      const data = await respuesta.json();
+
+      if (data.existe) {
+        // Autocompletar datos del apoderado existente
+        setDatosEdicion({
+          ...datosEdicion,
+          rut_apoderado: data.rut_apoderado,
+          nombres_apoderado: data.nombres_apoderado,
+          apellido_paterno_apoderado: data.apellido_paterno_apoderado,
+          apellido_materno_apoderado: data.apellido_materno_apoderado,
+          domicilio_apoderado: data.domicilio_apoderado,
+          telefono_apoderado: data.telefono_apoderado,
+          correo_apoderado: data.correo_apoderado,
+        });
+        setAvisoApoderado(
+          `✅ Apoderado encontrado: ${data.nombres_apoderado} ${data.apellido_paterno_apoderado}. ` +
+          `Asociado a ${data.n_estudiantes} estudiante(s). Al guardar, este alumno quedará vinculado a él ` +
+          `(sus datos NO se modificarán salvo que los edites explícitamente).`
+        );
+      } else {
+        setAvisoApoderado('ℹ️ No existe un apoderado con ese RUT. Completa los datos para crearlo al guardar.');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setBuscandoApoderado(false);
     }
   };
 
@@ -359,6 +405,7 @@ export const useEstudiantes = () => {
     cargandoLista, estudiantesFiltrados,
     verFichaEstudiante,
     datosEdicion, setDatosEdicion,
+    buscarApoderadoPorRut, buscandoApoderado, avisoApoderado, setAvisoApoderado,
     estudianteCreadoExito, rutRecienCreado, cerrarModalExito, irAMatricular,
     nuevoEstudiante, setNuevoEstudiante, formatearRUT, handleCrearEstudiante,
     creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion

@@ -3,3 +3,35 @@ alumnos excedentes
     Ya existe pero poder llevarlo al registro de matriculas y asi que la cantidad sea mas visible
 
 *SAcar los Jardines del sistema
+
+* DOMICILIO GEO-REFERENCIADO (estudiante y/o apoderado)
+    Rediseñar el campo de domicilio para poder geo-referenciar al alumno.
+    Separar la direccion en campos estructurados:
+      - Calle / Avenida
+      - Numero
+      - Comuna
+      - Region
+      - Depto / Casa / Block (opcional, o como observacion)
+    Objetivo: obtener lat/long confiables (ya existe integracion con Nominatim/OpenStreetMap
+    en la creacion de estudiante) y poder ubicar al alumno en un mapa.
+    Nota tecnica: hoy la tabla estudiante tiene domicilio (texto), latitud, longitud (varchar).
+    La tabla apoderado tiene domicilio (texto). Decidir si los campos estructurados van en
+    columnas nuevas o en un JSON, y si aplican al estudiante, al apoderado o ambos.
+    PENDIENTE: por eso hoy el campo "domicilio" del apoderado en la ficha quedo deshabilitado
+    de guardado hasta rediseñar este modelo.
+
+
+Establecimientos que necesitan carga de datos 2026
+RBD	Nombre	Tipo
+1515	Liceo Eduardo de la Barra	Liceo
+1521	Liceo de Niñas María Franck de MacDougal	Liceo
+33425	Acuarelas Porteñas	Jardín
+33427	Jardín Sala Cuna Sauce de Luz	Jardín
+33428	Escuela Florida	Escuela
+33433	Pequeños Genios	Jardín
+33434	Tortuguitas	Jardín
+33435	Joyita del Pacífico	Jardín
+33436	Mi Pequeño Puerto	Jardín
+33437	Valparaniños	Jardín
+33441	Jardín Sala Cuna Pequeños Pasos	Jardín
+33442	Jardín Sala Cuna Volantín de Colores	Jardín

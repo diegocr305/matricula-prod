@@ -60,6 +60,10 @@ def crear_estudiante(payload: CrearEstudianteRequest, usuario_actual: dict = Dep
     # .model_dump() convierte la clase segura nuevamente en diccionario para el servicio
     return estudiante_service.crear_estudiante_db(payload.model_dump())
 
+@router.get("/apoderado/buscar/{rut_apoderado}")
+def buscar_apoderado(rut_apoderado: str, usuario_actual: dict = Depends(obtener_usuario_actual)):
+    return estudiante_service.buscar_apoderado_por_rut_db(rut_apoderado)
+
 @router.put("/{rut}")
 def actualizar_datos_estudiante(rut: str, req: ActualizarEstudianteRequest, usuario_actual: dict = Depends(verificar_escritura)):
     return estudiante_service.actualizar_datos_estudiante_db(rut, req)
