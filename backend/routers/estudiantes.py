@@ -34,14 +34,14 @@ class CrearEstudianteRequest(BaseModel):
     doc_extranjero_apoderado: Optional[str] = None
 
 class ActualizarEstudianteRequest(BaseModel):
-    domicilio_estudiante: str
-    rut_apoderado: str
-    nombres_apoderado: str
-    apellido_paterno_apoderado: str
-    apellido_materno_apoderado: str
-    domicilio_apoderado: str
-    telefono_apoderado: str
-    correo_apoderado: str
+    domicilio_estudiante: Optional[str] = ""
+    rut_apoderado: Optional[str] = ""
+    nombres_apoderado: Optional[str] = ""
+    apellido_paterno_apoderado: Optional[str] = ""
+    apellido_materno_apoderado: Optional[str] = ""
+    domicilio_apoderado: Optional[str] = ""
+    telefono_apoderado: Optional[str] = ""
+    correo_apoderado: Optional[str] = ""
 
 @router.get("")
 def obtener_estudiantes(establecimiento_id: Optional[int] = None, usuario_actual: dict = Depends(obtener_usuario_actual)):

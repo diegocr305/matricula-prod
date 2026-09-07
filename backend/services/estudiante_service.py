@@ -76,7 +76,14 @@ def obtener_ficha_estudiante_db(rut: str):
                 "rut": estudiante_db[7] if estudiante_db[7] else "Sin registrar",
                 "nombre": f"{estudiante_db[8]} {estudiante_db[9]} {estudiante_db[10]}" if estudiante_db[8] else "Pendiente",
                 "telefono": estudiante_db[11] if estudiante_db[11] else "-",
-                "correo": estudiante_db[12] if estudiante_db[12] else "-"
+                "correo": estudiante_db[12] if estudiante_db[12] else "-",
+                # Campos individuales para edición (pueden venir None si el apoderado está pendiente)
+                "rut_raw": estudiante_db[7] or "",
+                "nombres": estudiante_db[8] or "",
+                "apellido_paterno": estudiante_db[9] or "",
+                "apellido_materno": estudiante_db[10] or "",
+                "telefono_raw": estudiante_db[11] or "",
+                "correo_raw": estudiante_db[12] or ""
             },
             "historial": [
                 {

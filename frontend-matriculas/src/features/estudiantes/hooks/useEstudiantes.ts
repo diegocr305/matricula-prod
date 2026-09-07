@@ -177,9 +177,15 @@ export const useEstudiantes = () => {
       setDatosEstudiante(datos);
       
       setDatosEdicion({
-        domicilio: datos.personal.domicilio || '',
-        telefono_apoderado: datos.apoderado.telefono || '',
-        correo_apoderado: datos.apoderado.correo || ''
+        // Nombres de campos alineados con el backend (ActualizarEstudianteRequest)
+        domicilio_estudiante: datos.personal.domicilio && datos.personal.domicilio !== 'Sin registrar' ? datos.personal.domicilio : '',
+        rut_apoderado: datos.apoderado.rut_raw || '',
+        nombres_apoderado: datos.apoderado.nombres || '',
+        apellido_paterno_apoderado: datos.apoderado.apellido_paterno || '',
+        apellido_materno_apoderado: datos.apoderado.apellido_materno || '',
+        domicilio_apoderado: '',
+        telefono_apoderado: datos.apoderado.telefono_raw || '',
+        correo_apoderado: datos.apoderado.correo_raw || ''
       });
     } catch (err: any) {
       setError(err.message);
@@ -189,6 +195,22 @@ export const useEstudiantes = () => {
   };
 
   const handleGuardarEdicion = async () => {
+    // Validación del RUT del apoderado (si se ingresó). Aceptamos IPA/pasaporte
+    // extranjero (>=10 caracteres alfanuméricos) igual que en la creación.
+    const rutApod = (datosEdicion.rut_apoderado || '').trim();
+    if (rutApod) {
+      const esIpaApoderado = rutApod.replace(/[^0-9kK]/g, '').length >= 10;
+      if (!esIpaApoderado && !validarRUT(rutApod)) {
+        alert('⚠️ El RUT del Apoderado no es válido. Revisa el dígito verificador (formato 12345678-9).');
+        return;
+      }
+      // Si hay RUT, exigimos al menos el nombre para no crear apoderados vacíos.
+      if (!(datosEdicion.nombres_apoderado || '').trim()) {
+        alert('⚠️ Ingresa al menos el nombre del apoderado.');
+        return;
+      }
+    }
+
     setGuardandoEdicion(true);
     const token = localStorage.getItem('token');
 

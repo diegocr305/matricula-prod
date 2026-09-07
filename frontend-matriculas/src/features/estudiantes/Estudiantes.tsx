@@ -164,8 +164,31 @@ export default function Estudiantes() {
                 <h2 className="text-lg font-bold text-gray-800">Apoderado Titular</h2>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-sm text-gray-500">Nombre</p><p className="font-medium">{datosEstudiante.apoderado.nombre}</p></div>
-                <div><p className="text-sm text-gray-500">RUT</p><p className="font-medium">{datosEstudiante.apoderado.rut}</p></div>
+                {!modoEdicion ? (
+                  <>
+                    <div><p className="text-sm text-gray-500">Nombre</p><p className="font-medium">{datosEstudiante.apoderado.nombre}</p></div>
+                    <div><p className="text-sm text-gray-500">RUT</p><p className="font-medium">{datosEstudiante.apoderado.rut}</p></div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">RUT Apoderado</p>
+                      <input type="text" placeholder="12345678-9" value={datosEdicion.rut_apoderado} onChange={(e) => setDatosEdicion({...datosEdicion, rut_apoderado: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Nombres</p>
+                      <input type="text" placeholder="Nombres" value={datosEdicion.nombres_apoderado} onChange={(e) => setDatosEdicion({...datosEdicion, nombres_apoderado: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Apellido Paterno</p>
+                      <input type="text" placeholder="Apellido paterno" value={datosEdicion.apellido_paterno_apoderado} onChange={(e) => setDatosEdicion({...datosEdicion, apellido_paterno_apoderado: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Apellido Materno</p>
+                      <input type="text" placeholder="Apellido materno" value={datosEdicion.apellido_materno_apoderado} onChange={(e) => setDatosEdicion({...datosEdicion, apellido_materno_apoderado: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    </div>
+                  </>
+                )}
                 <div className="pt-2 border-t border-gray-50">
                   <p className="text-sm text-gray-500 mb-1">Teléfono</p>
                   {!modoEdicion ? (
