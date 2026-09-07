@@ -42,6 +42,10 @@ Ver `DESPLIEGUE.md` en la raíz para la guía completa. Puntos clave:
 - `backend/.env`, `frontend-matriculas/.env.local`, `.env.production` → ignorados por git.
 - No poner secretos (passwords, client secret, service_role key) en steering, código ni docs versionados.
 
-## Git
-- Repo: `matriculas-sistema` (rama `main`). El backend delega lógica a `backend/services/`;
-  el frontend usa hooks en `features/*/hooks/`.
+## Git — remotes
+- **Máquina local del dev**: `origin` = `bastianaravenaSLEP/matriculas-sistema` (sin permiso de
+  escritura); `prod` = `diegocr305/matricula-prod` (repo de producción, donde SÍ se pushea).
+  Para publicar: `git push prod main`.
+- **Servidor de producción**: el remote se llama `origin` y apunta a `matricula-prod`.
+  Para actualizar en el server: `git pull origin main`.
+- El backend delega lógica a `backend/services/`; el frontend usa hooks en `features/*/hooks/`.
