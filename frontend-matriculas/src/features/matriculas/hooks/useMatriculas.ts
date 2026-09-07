@@ -33,7 +33,9 @@ export const useMatriculas = () => {
   const [error, setError] = useState('');
   
   const [busqueda, setBusqueda] = useState('');
-  const [filtroAnio, setFiltroAnio] = useState(''); 
+  // filtroAnio: '' hasta que el backend nos diga el año por defecto; 'todos' = histórico
+  const [filtroAnio, setFiltroAnio] = useState('');
+  const [aniosDisponibles, setAniosDisponibles] = useState<number[]>([]);
   const [filtroCodigo, setFiltroCodigo] = useState('');
   const [filtroCurso, setFiltroCurso] = useState('');
   const [ordenFolio, setOrdenFolio] = useState<'asc' | 'desc' | null>('asc'); 
@@ -108,7 +110,7 @@ export const useMatriculas = () => {
     }
   };
 
-  const cargarMatriculas = () => {
+  const cargarMatriculas = (anioParam?: string) => {
     if (!colegioSeleccionado) {
       setMatriculas([]);
       setCargando(false);
@@ -117,7 +119,13 @@ export const useMatriculas = () => {
 
     setCargando(true);
     const token = localStorage.getItem('token');
-    const url = `${API_URL}/matriculas?establecimiento_id=${colegioSeleccionado}`;
+    // Si nos pasan un año explícito lo usamos; si no, el que esté en filtroAnio.
+    // '' significa "usar el año por defecto del backend" (no se manda el parámetro).
+    const anioUsar = anioParam !== undefined ? anioParam : filtroAnio;
+    let url = `${API_URL}/matriculas?establecimiento_id=${colegioSeleccionado}`;
+    if (anioUsar) {
+      url += `&anio=${anioUsar}`;
+    }
 
     fetch(url, {
       method: 'GET',
@@ -140,18 +148,52 @@ export const useMatriculas = () => {
       });
   };
 
+  // Al cambiar de colegio: pedir años disponibles y fijar el año por defecto (último con datos).
   useEffect(() => {
-    cargarMatriculas();
-  }, [colegioSeleccionado]); 
+    if (!colegioSeleccionado) {
+      setAniosDisponibles([]);
+      setMatriculas([]);
+      setCargando(false);
+      return;
+    }
+    const token = localStorage.getItem('token');
+    fetch(`${API_URL}/matriculas/anios-disponibles?establecimiento_id=${colegioSeleccionado}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : { anios: [], por_defecto: null })
+      .then((data: { anios: number[]; por_defecto: number | null }) => {
+        setAniosDisponibles(data.anios || []);
+        const porDefecto = data.por_defecto ? String(data.por_defecto) : '';
+        // Fijar el año por defecto; el efecto de filtroAnio disparará la carga.
+        setFiltroAnio(porDefecto);
+        cargarMatriculas(porDefecto);
+      })
+      .catch(() => {
+        setAniosDisponibles([]);
+        cargarMatriculas('');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colegioSeleccionado]);
+
+  // Al cambiar el filtro de año (por el usuario), recargar desde el backend.
+  const primeraCargaAnio = useMemo(() => ({ v: true }), [colegioSeleccionado]);
+  useEffect(() => {
+    // Evitamos doble carga en el montaje inicial (ya la hizo el efecto de arriba).
+    if (primeraCargaAnio.v) {
+      primeraCargaAnio.v = false;
+      return;
+    }
+    cargarMatriculas(filtroAnio);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroAnio]);
 
   useEffect(() => {
     setFiltroCurso('');
   }, [filtroCodigo]);
 
-  const aniosUnicos = useMemo(() => {
-    const anios = matriculas.map(m => m.anio_escolar).filter(Boolean);
-    return Array.from(new Set(anios)).sort((a, b) => b - a);
-  }, [matriculas]);
+  // Años para el selector: vienen del backend (no de las matrículas cargadas,
+  // que ahora solo contienen un año por defecto).
+  const aniosUnicos = aniosDisponibles;
 
   const codigosUnicos = useMemo(() => {
     const codigos = matriculas.map(m => m.cod_tipo_ensenanza).filter(cod => cod !== null);
@@ -192,11 +234,11 @@ export const useMatriculas = () => {
         mat.numero_correlativo.toString().includes(textoBuscado) ||
         mat.estudiante_nombre.toLowerCase().includes(textoBuscado);
       
-      const coincideAnio = filtroAnio === '' || mat.anio_escolar?.toString() === filtroAnio;
+      // El año ya viene filtrado desde el backend; aquí solo búsqueda, código y curso.
       const coincideCodigo = filtroCodigo === '' || mat.cod_tipo_ensenanza?.toString() === filtroCodigo;
       const coincideCurso = filtroCurso === '' || mat.curso === filtroCurso;
 
-      return coincideBusqueda && coincideAnio && coincideCodigo && coincideCurso;
+      return coincideBusqueda && coincideCodigo && coincideCurso;
     });
 
     resultado.sort((a, b) => {
@@ -218,7 +260,7 @@ export const useMatriculas = () => {
     });
 
     return resultado;
-  }, [matriculas, busqueda, filtroAnio, filtroCodigo, filtroCurso, ordenFolio, ordenEstado]);
+  }, [matriculas, busqueda, filtroCodigo, filtroCurso, ordenFolio, ordenEstado]);
 
   // ============================================================================
   // ðŸŒŸ NUEVO: LÃ“GICA DE INDICADOR INTELIGENTE DE CUPOS (45 ALUMNOS)
@@ -226,7 +268,8 @@ export const useMatriculas = () => {
   const LIMITE_CUPOS = 45;
   
   // Solo se mostrarÃ¡ el cuadro informativo si los 3 filtros principales estÃ¡n seleccionados
-  const mostrarCupos = filtroAnio !== '' && filtroCodigo !== '' && filtroCurso !== '';
+  // Cupos son por año-curso específico: no aplica con "Todos los años" ni sin año.
+  const mostrarCupos = filtroAnio !== '' && filtroAnio !== 'todos' && filtroCodigo !== '' && filtroCurso !== '';
 
   const cuposOcupados = useMemo(() => {
     if (!mostrarCupos) return 0;

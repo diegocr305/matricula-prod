@@ -16,12 +16,22 @@ class CambioCursoRequest(BaseModel):
     motivo_cambio_curso: Optional[str] = None 
 
 @router.get("")
-def obtener_matriculas(establecimiento_id: Optional[int] = None, usuario_actual: dict = Depends(obtener_usuario_actual)):
+def obtener_matriculas(establecimiento_id: Optional[int] = None, anio: Optional[str] = None, usuario_actual: dict = Depends(obtener_usuario_actual)):
     rol = usuario_actual.get("rol")
     if rol in ["Colegio", "Visualizador_Colegio"]:
         establecimiento_id = usuario_actual.get("id_establecimiento")
-        
-    return matricula_service.obtener_todas_matriculas_db(establecimiento_id)
+
+    # anio: None -> último año con datos; "todos" -> histórico completo; "<n>" -> ese año
+    return matricula_service.obtener_todas_matriculas_db(establecimiento_id, anio)
+
+
+@router.get("/anios-disponibles")
+def anios_disponibles(establecimiento_id: Optional[int] = None, usuario_actual: dict = Depends(obtener_usuario_actual)):
+    rol = usuario_actual.get("rol")
+    if rol in ["Colegio", "Visualizador_Colegio"]:
+        establecimiento_id = usuario_actual.get("id_establecimiento")
+
+    return matricula_service.obtener_anios_disponibles_db(establecimiento_id)
 
 @router.post("")
 def crear_matricula(matricula: MatriculaCreate, usuario_actual: dict = Depends(verificar_escritura)):

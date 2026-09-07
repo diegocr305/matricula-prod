@@ -80,8 +80,8 @@ export default function Matriculas() {
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📅 1. Año</label>
             <select value={filtroAnio} onChange={(e) => setFiltroAnio(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white cursor-pointer">
-              <option value="">Todos los años</option>
               {aniosUnicos.map(anio => <option key={anio} value={anio}>{anio}</option>)}
+              <option value="todos">Todos los años</option>
             </select>
           </div>
           <div>

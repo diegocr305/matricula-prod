@@ -11,7 +11,60 @@ from services.pdf_service import generar_certificado_pdf
 from services.email_service import enviar_correo_retiro, enviar_correo_cambio_curso
 from services.utils import determinar_nivel_backend
 
-def obtener_todas_matriculas_db(establecimiento_id: int = None):
+def obtener_anio_por_defecto_db(establecimiento_id: int = None):
+    """Devuelve el mayor anio_escolar con datos (del establecimiento si se indica, o global)."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        if establecimiento_id is not None:
+            cur.execute("SELECT MAX(anio_escolar) FROM matricula WHERE id_establecimiento = %s", (establecimiento_id,))
+        else:
+            cur.execute("SELECT MAX(anio_escolar) FROM matricula")
+        fila = cur.fetchone()
+        return fila[0] if fila and fila[0] is not None else None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def obtener_anios_disponibles_db(establecimiento_id: int = None):
+    """Lista de años con datos + el año por defecto, para poblar el selector del frontend."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        if establecimiento_id is not None:
+            cur.execute(
+                "SELECT DISTINCT anio_escolar FROM matricula WHERE id_establecimiento = %s ORDER BY anio_escolar DESC",
+                (establecimiento_id,),
+            )
+        else:
+            cur.execute("SELECT DISTINCT anio_escolar FROM matricula ORDER BY anio_escolar DESC")
+        anios = [f[0] for f in cur.fetchall()]
+        return {"anios": anios, "por_defecto": anios[0] if anios else None}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def obtener_todas_matriculas_db(establecimiento_id: int = None, anio=None):
+    """
+    Devuelve matrículas filtradas por año.
+    - anio None            -> usa el último año con datos (por defecto).
+    - anio 'todos'         -> sin filtro de año (histórico completo).
+    - anio <número/str num> -> ese año específico.
+    """
+    # Resolver el año a usar
+    anio_filtro = None  # None = sin filtro (caso 'todos')
+    if anio is None:
+        anio_filtro = obtener_anio_por_defecto_db(establecimiento_id)
+    elif str(anio).lower() == "todos":
+        anio_filtro = None
+    else:
+        try:
+            anio_filtro = int(anio)
+        except (ValueError, TypeError):
+            anio_filtro = obtener_anio_por_defecto_db(establecimiento_id)
+
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -30,7 +83,11 @@ def obtener_todas_matriculas_db(establecimiento_id: int = None):
         if establecimiento_id is not None:
             query += " AND m.id_establecimiento = %s"
             parametros.append(establecimiento_id)
-            
+
+        if anio_filtro is not None:
+            query += " AND m.anio_escolar = %s"
+            parametros.append(anio_filtro)
+
         query += " ORDER BY m.id_matricula DESC"
         cur.execute(query, tuple(parametros))
         
