@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { API_URL } from '../../../config/api';
 
 export const useCuestionarioRetiro = () => {
   const { id } = useParams(); 
@@ -14,7 +15,7 @@ export const useCuestionarioRetiro = () => {
     setEstado('cargando');
     
     try {
-      const respuesta = await fetch(`http://127.0.0.1:8000/matriculas/${id}/cuestionario`, {
+      const respuesta = await fetch(`${API_URL}/matriculas/${id}/cuestionario`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

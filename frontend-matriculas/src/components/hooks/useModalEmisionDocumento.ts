@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
+import { API_URL } from '../../config/api';
 
 export const useModalEmisionDocumento = (
   idMatricula: number,
@@ -25,20 +26,20 @@ export const useModalEmisionDocumento = (
 
   const getTitulo = () => {
     switch (tipoDocumento) {
-      case 'MATRICULA': return 'Emitir Certificado de Matrícula';
+      case 'MATRICULA': return 'Emitir Certificado de MatrÃ­cula';
       case 'RETIRO': return 'Emitir Comprobante de Retiro';
       case 'CAMBIO_CURSO': return 'Emitir Certificado de Cambio';
     }
   };
 
   const handleEnviarCorreos = async () => {
-    // Recopilar los correos que estén chequeados y no estén vacíos
+    // Recopilar los correos que estÃ©n chequeados y no estÃ©n vacÃ­os
     const destinatarios: string[] = [];
     if (enviarDirector && correoDirector.trim() !== '') destinatarios.push(correoDirector.trim());
     if (enviarApoderado && correoApoderado.trim() !== '') destinatarios.push(correoApoderado.trim());
 
     if (destinatarios.length === 0) {
-      alert('Debe ingresar y marcar al menos un correo electrónico para realizar el envío.');
+      alert('Debe ingresar y marcar al menos un correo electrÃ³nico para realizar el envÃ­o.');
       return;
     }
 
@@ -46,7 +47,7 @@ export const useModalEmisionDocumento = (
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch('http://127.0.0.1:8000/documentos/emitir', {
+      const res = await fetch(`${API_URL}/documentos/emitir`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export const useModalEmisionDocumento = (
   };
 
   const handleDescargarLocal = () => {
-    window.open(`http://127.0.0.1:8000/matriculas/${idMatricula}/certificado?tipo=${tipoDocumento}`, '_blank');  
+    window.open(`${API_URL}/matriculas/${idMatricula}/certificado?tipo=${tipoDocumento}`, '_blank');  
   };
 
   return {

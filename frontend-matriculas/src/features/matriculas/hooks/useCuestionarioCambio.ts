@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { API_URL } from '../../../config/api';
 
 export const useCuestionarioCambio = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +16,7 @@ export const useCuestionarioCambio = () => {
     setMensaje(null);
 
     try {
-      const respuesta = await fetch(`http://127.0.0.1:8000/matriculas/${id}/cuestionario-curso`, {
+      const respuesta = await fetch(`${API_URL}/matriculas/${id}/cuestionario-curso`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -29,10 +30,10 @@ export const useCuestionarioCambio = () => {
       const datos = await respuesta.json();
 
       if (!respuesta.ok) {
-        throw new Error(datos.detail || 'Ocurrió un error al guardar el motivo.');
+        throw new Error(datos.detail || 'OcurriÃ³ un error al guardar el motivo.');
       }
 
-      setMensaje({ texto: 'Formulario enviado con éxito. Puede cerrar esta pestaña.', tipo: 'exito' });
+      setMensaje({ texto: 'Formulario enviado con Ã©xito. Puede cerrar esta pestaÃ±a.', tipo: 'exito' });
       setRutEstudiante('');
       setMotivo('');
     } catch (error: any) {

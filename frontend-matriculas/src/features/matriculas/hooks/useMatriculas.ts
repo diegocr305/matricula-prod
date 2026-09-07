@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { API_URL } from '../../../config/api';
 
 export interface Matricula {
   id_matricula: number;
@@ -21,7 +22,7 @@ export interface Matricula {
 export const useMatriculas = () => {
   const { colegioSeleccionado } = useOutletContext<{ colegioSeleccionado: string }>();
 
-  // --- LÓGICA DE ROLES ---
+  // --- LÃ“GICA DE ROLES ---
   const usuarioString = localStorage.getItem('usuario');
   const usuario = usuarioString ? JSON.parse(usuarioString) : null;
   const puedeEditar = !['Visualizador_SLEP', 'Visualizador_Colegio'].includes(usuario?.rol);
@@ -88,7 +89,7 @@ export const useMatriculas = () => {
     const token = localStorage.getItem('token'); 
 
     try {
-      const respuesta = await fetch("http://127.0.0.1:8000/matriculas/carga-masiva", {
+      const respuesta = await fetch(`${API_URL}/matriculas/carga-masiva`, {
         method: "POST",
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
@@ -116,7 +117,7 @@ export const useMatriculas = () => {
 
     setCargando(true);
     const token = localStorage.getItem('token');
-    const url = `http://127.0.0.1:8000/matriculas?establecimiento_id=${colegioSeleccionado}`;
+    const url = `${API_URL}/matriculas?establecimiento_id=${colegioSeleccionado}`;
 
     fetch(url, {
       method: 'GET',
@@ -220,16 +221,16 @@ export const useMatriculas = () => {
   }, [matriculas, busqueda, filtroAnio, filtroCodigo, filtroCurso, ordenFolio, ordenEstado]);
 
   // ============================================================================
-  // 🌟 NUEVO: LÓGICA DE INDICADOR INTELIGENTE DE CUPOS (45 ALUMNOS)
+  // ðŸŒŸ NUEVO: LÃ“GICA DE INDICADOR INTELIGENTE DE CUPOS (45 ALUMNOS)
   // ============================================================================
   const LIMITE_CUPOS = 45;
   
-  // Solo se mostrará el cuadro informativo si los 3 filtros principales están seleccionados
+  // Solo se mostrarÃ¡ el cuadro informativo si los 3 filtros principales estÃ¡n seleccionados
   const mostrarCupos = filtroAnio !== '' && filtroCodigo !== '' && filtroCurso !== '';
 
   const cuposOcupados = useMemo(() => {
     if (!mostrarCupos) return 0;
-    // Solo contamos las matrículas que están activas dentro del curso que ya filtramos arriba
+    // Solo contamos las matrÃ­culas que estÃ¡n activas dentro del curso que ya filtramos arriba
     return matriculasProcesadas.filter(m => m.estado === 'Activa').length;
   }, [matriculasProcesadas, mostrarCupos]);
   // ============================================================================
@@ -269,7 +270,7 @@ export const useMatriculas = () => {
     const token = localStorage.getItem('token'); 
 
     try {
-      const respuesta = await fetch(`http://127.0.0.1:8000/matriculas/${idSeleccionado}`, {
+      const respuesta = await fetch(`${API_URL}/matriculas/${idSeleccionado}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
@@ -284,12 +285,12 @@ export const useMatriculas = () => {
       if (!respuesta.ok) throw new Error('Error al procesar la baja en el sistema');
 
       if (descargarLocalRetiro) {
-        window.open(`http://127.0.0.1:8000/matriculas/${idSeleccionado}/certificado?tipo=RETIRO`, '_blank');
+        window.open(`${API_URL}/matriculas/${idSeleccionado}/certificado?tipo=RETIRO`, '_blank');
       }
 
       setModalAbierto(false);
       cargarMatriculas(); 
-      alert('Retiro procesado y comprobante enviado con éxito.');
+      alert('Retiro procesado y comprobante enviado con Ã©xito.');
 
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -314,7 +315,7 @@ export const useMatriculas = () => {
     if (!idSeleccionado || !planDestino || !cursoDestino) return;
 
     if (advertenciaNivel) {
-      const seguro = window.confirm(`⚠️ ADVERTENCIA DE SEGURIDAD:\n\n${advertenciaNivel}\n\n¿Está completamente seguro de que desea confirmar este cambio de nivel?`);
+      const seguro = window.confirm(`âš ï¸ ADVERTENCIA DE SEGURIDAD:\n\n${advertenciaNivel}\n\nÂ¿EstÃ¡ completamente seguro de que desea confirmar este cambio de nivel?`);
       if (!seguro) return; 
     }
     
@@ -331,7 +332,7 @@ export const useMatriculas = () => {
     const token = localStorage.getItem('token'); 
 
     try {
-      const respuesta = await fetch(`http://127.0.0.1:8000/matriculas/${idSeleccionado}/curso`, {
+      const respuesta = await fetch(`${API_URL}/matriculas/${idSeleccionado}/curso`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ 
@@ -345,12 +346,12 @@ export const useMatriculas = () => {
       if (!respuesta.ok) throw new Error(datos.detail || 'Error al cambiar de curso');
 
       if (descargarLocalCurso) {
-        window.open(`http://127.0.0.1:8000/matriculas/${idSeleccionado}/certificado?tipo=CAMBIO_CURSO`, '_blank');
+        window.open(`${API_URL}/matriculas/${idSeleccionado}/certificado?tipo=CAMBIO_CURSO`, '_blank');
       }
 
       setModalCursoAbierto(false);
       cargarMatriculas();
-      alert('Traslado registrado y certificado enviado con éxito.');
+      alert('Traslado registrado y certificado enviado con Ã©xito.');
 
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -363,7 +364,7 @@ export const useMatriculas = () => {
     const advertencias: string[] = [];
 
     if (planDestino && codigoActual && planDestino !== codigoActual.toString()) {
-      advertencias.push(`• Cambio de CÓDIGO DE ENSEÑANZA (de Cod. ${codigoActual} a Cod. ${planDestino}).`);
+      advertencias.push(`â€¢ Cambio de CÃ“DIGO DE ENSEÃ‘ANZA (de Cod. ${codigoActual} a Cod. ${planDestino}).`);
     }
 
     if (cursoDestino && cursoActual) {
@@ -375,18 +376,18 @@ export const useMatriculas = () => {
         const numDestino = parseInt(numDestinoMatch[0]);
 
         if (numDestino < numActual) {
-          advertencias.push(`• Está moviendo al alumno a un grado INFERIOR (de ${numActual} a ${numDestino}).`);
+          advertencias.push(`â€¢ EstÃ¡ moviendo al alumno a un grado INFERIOR (de ${numActual} a ${numDestino}).`);
         } else if (numDestino > numActual + 1) {
-          advertencias.push(`• Está saltando múltiples grados hacia ADELANTE (de ${numActual} a ${numDestino}).`);
+          advertencias.push(`â€¢ EstÃ¡ saltando mÃºltiples grados hacia ADELANTE (de ${numActual} a ${numDestino}).`);
         } else if (numDestino === numActual + 1) {
-          advertencias.push(`• Está adelantando al alumno al grado SIGUIENTE (de ${numActual} a ${numDestino}). Normalmente los traslados a mitad de año son en el mismo grado.`);
+          advertencias.push(`â€¢ EstÃ¡ adelantando al alumno al grado SIGUIENTE (de ${numActual} a ${numDestino}). Normalmente los traslados a mitad de aÃ±o son en el mismo grado.`);
         }
       } else {
         const baseActual = cursoActual.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
         const baseDestino = cursoDestino.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
         
         if (baseActual !== baseDestino) {
-          advertencias.push(`• Está cambiando el nivel del curso de '${cursoActual}' a '${cursoDestino}'.`);
+          advertencias.push(`â€¢ EstÃ¡ cambiando el nivel del curso de '${cursoActual}' a '${cursoDestino}'.`);
         }
       }
     }
@@ -425,6 +426,6 @@ export const useMatriculas = () => {
     datosEmision,
     aniosUnicos, codigosUnicos, cursosUnicos, estructuraColegio, matriculasProcesadas,
     manejarSubidaCSV, abrirModalEmision, iniciarRetiro, confirmarRetiro, iniciarCambioCurso, confirmarCambioCurso,
-    mostrarCupos, cuposOcupados, LIMITE_CUPOS // 🌟 Añadimos las nuevas variables al return
+    mostrarCupos, cuposOcupados, LIMITE_CUPOS // ðŸŒŸ AÃ±adimos las nuevas variables al return
   };
 };

@@ -4,8 +4,9 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import '../index.css'
 import App from './App.tsx'
 
-// ⚠️ AQUÍ PEGARÁS EL MISMO CLIENT ID DE GOOGLE
-const GOOGLE_CLIENT_ID = "AQUI_IRA_TU_CLIENT_ID_DE_GOOGLE.apps.googleusercontent.com";
+// El Client ID de Google se lee desde la variable de entorno de Vite.
+// Define VITE_GOOGLE_CLIENT_ID en frontend-matriculas/.env.local
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

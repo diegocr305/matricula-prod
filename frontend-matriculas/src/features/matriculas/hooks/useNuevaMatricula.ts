@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
+import { API_URL } from '../../../config/api';
 
 export interface MatriculaBase {
   id_establecimiento: number;
@@ -9,7 +10,7 @@ export interface MatriculaBase {
   curso: string;
   estudiante_rut: string;
   anio_escolar: number;
-  estado?: string; // 🌟 Añadimos el estado para contar solo las Activas
+  estado?: string; // ðŸŒŸ AÃ±adimos el estado para contar solo las Activas
 }
 
 export const useNuevaMatricula = () => {
@@ -64,7 +65,7 @@ export const useNuevaMatricula = () => {
     numero_correlativo: '',
     anio_escolar: '2026',
     fecha_matricula: new Date().toISOString().split('T')[0],
-    nivel_ensenanza: 'Educación Básica',
+    nivel_ensenanza: 'EducaciÃ³n BÃ¡sica',
     cod_tipo_ensenanza: '',
     cursoSeleccionado: '',
     cod_grado: 1,
@@ -80,7 +81,7 @@ export const useNuevaMatricula = () => {
   const [idEstablecimientoPrevio, setIdEstablecimientoPrevio] = useState<string | null>(null);
 
   // ============================================================================
-  // 🌟 NUEVO: LÓGICA DE CONTROL DE CUPOS MÁXIMOS (45 ESTUDIANTES)
+  // ðŸŒŸ NUEVO: LÃ“GICA DE CONTROL DE CUPOS MÃXIMOS (45 ESTUDIANTES)
   // ============================================================================
   const LIMITE_CUPOS = 45;
 
@@ -97,12 +98,12 @@ export const useNuevaMatricula = () => {
     ).length;
   }, [formulario.id_establecimiento, formulario.anio_escolar, formulario.cod_tipo_ensenanza, formulario.cursoSeleccionado, todasLasMatriculas]);
 
-  // Si se llega al límite, forzamos que sea excedente automáticamente
+  // Si se llega al lÃ­mite, forzamos que sea excedente automÃ¡ticamente
   useEffect(() => {
     if (cuposOcupados >= LIMITE_CUPOS) {
       setFormulario(prev => ({ ...prev, es_excedente: true }));
     } else {
-      // Si cambia a un curso vacío, le quitamos el excedente automático por precaución
+      // Si cambia a un curso vacÃ­o, le quitamos el excedente automÃ¡tico por precauciÃ³n
       setFormulario(prev => ({ ...prev, es_excedente: false }));
     }
   }, [cuposOcupados]);
@@ -120,7 +121,7 @@ export const useNuevaMatricula = () => {
     const token = localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}` };
 
-    fetch('http://127.0.0.1:8000/establecimientos', { headers })
+    fetch(`${API_URL}/establecimientos`, { headers })
       .then(res => res.json())
       .then(data => {
         setEstablecimientosDb(data);
@@ -135,12 +136,12 @@ export const useNuevaMatricula = () => {
       })
       .catch(err => console.error("Error establecimientos:", err));
 
-    fetch('http://127.0.0.1:8000/matriculas', { headers })
+    fetch(`${API_URL}/matriculas`, { headers })
       .then(res => res.json())
       .then(data => setTodasLasMatriculas(data))
-      .catch(err => console.error("Error matrículas:", err));
+      .catch(err => console.error("Error matrÃ­culas:", err));
 
-    fetch('http://127.0.0.1:8000/estudiante', { headers })
+    fetch(`${API_URL}/estudiante`, { headers })
       .then(res => res.json())
       .then(datos => {
         setEstudiantesDb(datos);
@@ -155,13 +156,13 @@ export const useNuevaMatricula = () => {
 
   const determinarNivelInteligente = (cursoStr: string, codigoPlan: number) => {
     const texto = cursoStr.toLowerCase();
-    if (texto.includes('básico') || texto.includes('basico')) return 'Educación Básica';
-    if (texto.includes('medio') || texto.includes('media')) return 'Educación Media';
-    if (texto.includes('parvularia') || texto.includes('kínder') || texto.includes('kinder') || texto.includes('pre-kínder') || texto.includes('sala cuna')) return 'Educación Parvularia';
-    if (codigoPlan === 10) return 'Educación Parvularia';
-    if (codigoPlan >= 110 && codigoPlan <= 119) return 'Educación Básica';
-    if (codigoPlan >= 300) return 'Educación Media';
-    return 'Educación Básica'; 
+    if (texto.includes('bÃ¡sico') || texto.includes('basico')) return 'EducaciÃ³n BÃ¡sica';
+    if (texto.includes('medio') || texto.includes('media')) return 'EducaciÃ³n Media';
+    if (texto.includes('parvularia') || texto.includes('kÃ­nder') || texto.includes('kinder') || texto.includes('pre-kÃ­nder') || texto.includes('sala cuna')) return 'EducaciÃ³n Parvularia';
+    if (codigoPlan === 10) return 'EducaciÃ³n Parvularia';
+    if (codigoPlan >= 110 && codigoPlan <= 119) return 'EducaciÃ³n BÃ¡sica';
+    if (codigoPlan >= 300) return 'EducaciÃ³n Media';
+    return 'EducaciÃ³n BÃ¡sica'; 
   };
 
   const codigosDisponibles = useMemo(() => {
@@ -252,7 +253,7 @@ export const useNuevaMatricula = () => {
     if (!datos.personal.domicilio || datos.personal.domicilio === "Sin registrar") faltan.push("Domicilio del Estudiante");
     if (!datos.apoderado.rut || datos.apoderado.rut === "Sin registrar") faltan.push("RUT del Apoderado");
     if (!datos.apoderado.nombre || datos.apoderado.nombre === "Pendiente") faltan.push("Nombre Completo del Apoderado");
-    if (!datos.apoderado.telefono || datos.apoderado.telefono === "-") faltan.push("Teléfono del Apoderado");
+    if (!datos.apoderado.telefono || datos.apoderado.telefono === "-") faltan.push("TelÃ©fono del Apoderado");
     if (!datos.apoderado.correo || datos.apoderado.correo === "-") faltan.push("Correo del Apoderado");
     
     setDatosFaltantes(faltan);
@@ -272,7 +273,7 @@ export const useNuevaMatricula = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const resProcedencia = await fetch(`http://127.0.0.1:8000/matriculas/procedencia/${estRun}`, {
+      const resProcedencia = await fetch(`${API_URL}/matriculas/procedencia/${estRun}`, {
           headers: { 'Authorization': `Bearer ${token}` }
       });
       if (resProcedencia.ok) {
@@ -334,7 +335,7 @@ export const useNuevaMatricula = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const respuesta = await fetch(`http://127.0.0.1:8000/estudiante/${est.run}`, {
+      const respuesta = await fetch(`${API_URL}/estudiante/${est.run}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!respuesta.ok) throw new Error('Estudiante no encontrado en el sistema.');
@@ -357,7 +358,7 @@ export const useNuevaMatricula = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const respuesta = await fetch(`http://127.0.0.1:8000/estudiante/${estudiante.run}`, {
+      const respuesta = await fetch(`${API_URL}/estudiante/${estudiante.run}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -366,10 +367,10 @@ export const useNuevaMatricula = () => {
         body: JSON.stringify(formFaltantes) 
       });
 
-      if (!respuesta.ok) throw new Error('Error al guardar la información');
+      if (!respuesta.ok) throw new Error('Error al guardar la informaciÃ³n');
       
       const timestamp = new Date().getTime();
-      const refreshRes = await fetch(`http://127.0.0.1:8000/estudiante/${estudiante.run}?t=${timestamp}`, {
+      const refreshRes = await fetch(`${API_URL}/estudiante/${estudiante.run}?t=${timestamp}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
         cache: 'no-store' 
@@ -409,7 +410,7 @@ export const useNuevaMatricula = () => {
   const generarComprobantePDF = async () => {
     try {
       const token = localStorage.getItem('token');
-      const respuesta = await fetch(`http://127.0.0.1:8000/documentos/comprobante/${estudiante.run}`, {
+      const respuesta = await fetch(`${API_URL}/documentos/comprobante/${estudiante.run}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -452,7 +453,7 @@ export const useNuevaMatricula = () => {
       estado: 'Activa',
       fecha_retiro: null,
       motivo_retiro: null,
-      observaciones: 'Matrícula ingresada desde portal transaccional.',
+      observaciones: 'MatrÃ­cula ingresada desde portal transaccional.',
       id_usuario_ejecutor: 1,
       cod_tipo_ensenanza: formulario.cod_tipo_ensenanza ? parseInt(formulario.cod_tipo_ensenanza) : null,
       cod_grado: formulario.cod_grado,
@@ -466,7 +467,7 @@ export const useNuevaMatricula = () => {
     const token = localStorage.getItem('token');
 
     try {
-      const respuesta = await fetch('http://127.0.0.1:8000/matriculas', {
+      const respuesta = await fetch(`${API_URL}/matriculas`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -476,7 +477,7 @@ export const useNuevaMatricula = () => {
       });
 
       const datos = await respuesta.json();
-      if (!respuesta.ok) throw new Error(datos.detail || 'Error al guardar la matrícula.');
+      if (!respuesta.ok) throw new Error(datos.detail || 'Error al guardar la matrÃ­cula.');
       
       setMatriculaExitosa(true);
 
@@ -507,13 +508,13 @@ export const useNuevaMatricula = () => {
       const numDestino = parseInt(numDestinoMatch[0]);
 
       if (numDestino === numPrevio + 1) {
-        alertas.push({texto: `Promoción: El estudiante avanza al curso siguiente (de ${numPrevio} a ${numDestino}).`, tipo: 'info'});
+        alertas.push({texto: `PromociÃ³n: El estudiante avanza al curso siguiente (de ${numPrevio} a ${numDestino}).`, tipo: 'info'});
       } else if (numDestino === numPrevio) {
         alertas.push({texto: `Repitencia: El estudiante mantiene el mismo nivel cursado (${numPrevio}).`, tipo: 'alerta'});
       } else if (numDestino < numPrevio) {
-        alertas.push({texto: `Retroceso abrupto: Está matriculando al estudiante en un grado INFERIOR al que ya cursó (de ${numPrevio} a ${numDestino}).`, tipo: 'peligro'});
+        alertas.push({texto: `Retroceso abrupto: EstÃ¡ matriculando al estudiante en un grado INFERIOR al que ya cursÃ³ (de ${numPrevio} a ${numDestino}).`, tipo: 'peligro'});
       } else if (numDestino > numPrevio + 1) {
-        alertas.push({texto: `Salto abrupto: Está adelantando al estudiante múltiples grados (de ${numPrevio} a ${numDestino}).`, tipo: 'peligro'});
+        alertas.push({texto: `Salto abrupto: EstÃ¡ adelantando al estudiante mÃºltiples grados (de ${numPrevio} a ${numDestino}).`, tipo: 'peligro'});
       }
     } else {
       const basePrevio = cursoPrevio.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
@@ -522,7 +523,7 @@ export const useNuevaMatricula = () => {
       if (basePrevio === baseDestino) {
         alertas.push({texto: `Repitencia: El estudiante se mantiene en el nivel '${cursoPrevio}'.`, tipo: 'alerta'});
       } else {
-        alertas.push({texto: `Transición de nivel preescolar: de '${cursoPrevio}' a '${formulario.cursoSeleccionado}'.`, tipo: 'info'});
+        alertas.push({texto: `TransiciÃ³n de nivel preescolar: de '${cursoPrevio}' a '${formulario.cursoSeleccionado}'.`, tipo: 'info'});
       }
     }
 
@@ -538,6 +539,6 @@ export const useNuevaMatricula = () => {
     establecimientosDb, formulario, checkCertNotas, setCheckCertNotas, checkCertRetiro, setCheckCertRetiro,
     idEstablecimientoPrevio, codigosDisponibles, cursosDisponibles, 
     seleccionarCurso, handleEscribirBuscador, seleccionarEstudiante, guardarDatosFaltantes, copiarDomicilio, handleChange, generarComprobantePDF, handleSubmit, setCursoPrevio, setCodigoPrevio, setIdEstablecimientoPrevio,
-    esColegioEMTP, esCuartoMedio, cuposOcupados, LIMITE_CUPOS // 🌟 Añadido al return
+    esColegioEMTP, esCuartoMedio, cuposOcupados, LIMITE_CUPOS // ðŸŒŸ AÃ±adido al return
   };
 };

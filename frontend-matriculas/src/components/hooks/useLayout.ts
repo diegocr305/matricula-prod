@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { API_URL } from '../../config/api';
 
 export interface Establecimiento {
   id_establecimiento: number;
@@ -27,7 +28,7 @@ export const useLayout = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      fetch('http://127.0.0.1:8000/establecimientos', { headers: { 'Authorization': `Bearer ${token}` } })
+      fetch(`${API_URL}/establecimientos`, { headers: { 'Authorization': `Bearer ${token}` } })
         .then(res => res.json())
         .then(data => {
           const dataOrdenada = data.sort((a: Establecimiento, b: Establecimiento) => parseInt(a.rbd) - parseInt(b.rbd));
@@ -39,7 +40,7 @@ export const useLayout = () => {
 
   useEffect(() => {
     if (colegioSeleccionado === '') {
-      setBusquedaFiltro('🌍 Ver todos los Establecimientos (Nivel Central)');
+      setBusquedaFiltro('ðŸŒ Ver todos los Establecimientos (Nivel Central)');
     } else {
       const col = establecimientos.find(e => String(e.id_establecimiento) === String(colegioSeleccionado));
       if (col) setBusquedaFiltro(`RBD: ${col.rbd} - ${col.nombre}`);

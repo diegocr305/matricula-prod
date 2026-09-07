@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
+import { API_URL } from '../../../config/api';
 
 export const useVerificador = () => {
   const [rut, setRut] = useState('');
@@ -12,12 +13,12 @@ export const useVerificador = () => {
     setError(null);
 
     try {
-      // Como es público, no enviamos token de Authorization
-      const respuesta = await fetch(`http://127.0.0.1:8000/documentos/verificar?rut=${rut}&codigo=${codigo}`);
+      // Como es pÃºblico, no enviamos token de Authorization
+      const respuesta = await fetch(`${API_URL}/documentos/verificar?rut=${rut}&codigo=${codigo}`);
       
       if (!respuesta.ok) {
         const data = await respuesta.json();
-        throw new Error(data.detail || 'Ocurrió un error al verificar el documento.');
+        throw new Error(data.detail || 'OcurriÃ³ un error al verificar el documento.');
       }
 
       // Si es exitoso, el backend nos devuelve el PDF en crudo. Lo abrimos.

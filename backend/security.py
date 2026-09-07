@@ -1,12 +1,15 @@
+import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-SECRET_KEY = "slep_valparaiso_clave_secreta_super_segura"
+# La clave secreta del JWT se lee desde el entorno; el valor por defecto
+# solo aplica en desarrollo. En producción DEBE definirse JWT_SECRET_KEY.
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "slep_valparaiso_clave_secreta_super_segura")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 120 
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
+import { API_URL } from '../../../config/api';
 
-// 🌟 INTERFAZ: Le decimos a TypeScript exactamente qué campos tiene nuestro formulario
+// ðŸŒŸ INTERFAZ: Le decimos a TypeScript exactamente quÃ© campos tiene nuestro formulario
 export interface NuevoEstudianteForm {
   run: string;
   nombres: string;
@@ -35,7 +36,7 @@ export const formatearRUT = (rut: string) => {
 };
 
 export const validarRUT = (rutCompleto: string) => {
-  if (!/^[0-9]+[-|‐]{1}[0-9kK]{1}$/.test(rutCompleto)) return false;
+  if (!/^[0-9]+[-|â€]{1}[0-9kK]{1}$/.test(rutCompleto)) return false;
   
   const tmp = rutCompleto.split('-');
   const rut = tmp[0];
@@ -74,7 +75,7 @@ export const useEstudiantes = () => {
   const [estudianteCreadoExito, setEstudianteCreadoExito] = useState(false);
   const [rutRecienCreado, setRutRecienCreado] = useState('');
 
-  // 🌟 ESTADO INICIAL: Agregamos los campos de extranjería
+  // ðŸŒŸ ESTADO INICIAL: Agregamos los campos de extranjerÃ­a
   const [nuevoEstudiante, setNuevoEstudiante] = useState<NuevoEstudianteForm>({
     run: '', nombres: '', apellido_paterno: '', apellido_materno: '', fecha_nacimiento: '', sexo: 'Masculino', domicilio: '', latitud:'', longitud:'',
     run_apoderado: '', nombres_apoderado: '', apellido_paterno_apoderado: '', apellido_materno_apoderado: '', domicilio_apoderado: '', telefono_apoderado: '', correo_apoderado: '',
@@ -95,8 +96,8 @@ export const useEstudiantes = () => {
     const token = localStorage.getItem('token'); 
 
     const url = colegioSeleccionado 
-      ? `http://127.0.0.1:8000/estudiante?establecimiento_id=${colegioSeleccionado}`
-      : `http://127.0.0.1:8000/estudiante`;
+      ? `${API_URL}/estudiante?establecimiento_id=${colegioSeleccionado}`
+      : `${API_URL}/estudiante`;
 
     fetch(url, {
       method: 'GET',
@@ -135,7 +136,7 @@ export const useEstudiantes = () => {
     const token = localStorage.getItem('token');
 
     try {
-      const respuesta = await fetch("http://127.0.0.1:8000/estudiante/carga-masiva", {
+      const respuesta = await fetch(`${API_URL}/estudiante/carga-masiva`, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${token}` 
@@ -168,7 +169,7 @@ export const useEstudiantes = () => {
     const token = localStorage.getItem('token');
     
     try {
-      const respuesta = await fetch(`http://127.0.0.1:8000/estudiante/${rut}`, {
+      const respuesta = await fetch(`${API_URL}/estudiante/${rut}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!respuesta.ok) throw new Error('Error al cargar la ficha');
@@ -192,7 +193,7 @@ export const useEstudiantes = () => {
     const token = localStorage.getItem('token');
 
     try {
-      const respuesta = await fetch(`http://127.0.0.1:8000/estudiante/${datosEstudiante.personal.run}`, {
+      const respuesta = await fetch(`${API_URL}/estudiante/${datosEstudiante.personal.run}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -228,7 +229,7 @@ export const useEstudiantes = () => {
       if (datos && datos.length > 0) {
         setSugerenciasMapa(datos);
       } else {
-        alert("No se encontraron resultados en Chile. Intenta agregar la comuna, ej: 'Avenida Brasil, Valparaíso'.");
+        alert("No se encontraron resultados en Chile. Intenta agregar la comuna, ej: 'Avenida Brasil, ValparaÃ­so'.");
       }
     } catch (error) {
       console.error("Error al buscar coordenadas:", error);
@@ -248,7 +249,7 @@ export const useEstudiantes = () => {
     setSugerenciasMapa([]);
   };
 
-  // 🌟 VALIDACIÓN INTELIGENTE: Detecta el IPE e ignora la validación RUT tradicional
+  // ðŸŒŸ VALIDACIÃ“N INTELIGENTE: Detecta el IPE e ignora la validaciÃ³n RUT tradicional
   const handleCrearEstudiante = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -257,26 +258,26 @@ export const useEstudiantes = () => {
 
     // Validaciones Estudiante
     if (!esIpeEstudiante && !validarRUT(nuevoEstudiante.run)) {
-      alert("⚠️ El RUT del Estudiante no es válido. Revisa que el dígito verificador sea correcto.");
+      alert("âš ï¸ El RUT del Estudiante no es vÃ¡lido. Revisa que el dÃ­gito verificador sea correcto.");
       return;
     }
     if (esIpeEstudiante && (!nuevoEstudiante.pais_origen_estudiante || !nuevoEstudiante.doc_extranjero_estudiante)) {
-      alert("⚠️ El estudiante tiene un IPE. Debes ingresar obligatoriamente su País de Origen y Documento Nacional.");
+      alert("âš ï¸ El estudiante tiene un IPE. Debes ingresar obligatoriamente su PaÃ­s de Origen y Documento Nacional.");
       return;
     }
 
     // Validaciones Apoderado
     if (!esIpaApoderado && !validarRUT(nuevoEstudiante.run_apoderado)) {
-      alert("⚠️ El RUT del Apoderado no es válido. Revisa que el dígito verificador sea correcto.");
+      alert("âš ï¸ El RUT del Apoderado no es vÃ¡lido. Revisa que el dÃ­gito verificador sea correcto.");
       return;
     }
     if (esIpaApoderado && (!nuevoEstudiante.pais_origen_apoderado || !nuevoEstudiante.doc_extranjero_apoderado)) {
-      alert("⚠️ El apoderado tiene un IPA. Debes ingresar obligatoriamente su País de Origen y Documento Nacional.");
+      alert("âš ï¸ El apoderado tiene un IPA. Debes ingresar obligatoriamente su PaÃ­s de Origen y Documento Nacional.");
       return;
     }
 
     if (!nuevoEstudiante.latitud || !nuevoEstudiante.longitud) {
-      alert("⚠️ Acción requerida: Debes validar el Domicilio Actual usando el botón 'Buscar' antes de crear al estudiante.");
+      alert("âš ï¸ AcciÃ³n requerida: Debes validar el Domicilio Actual usando el botÃ³n 'Buscar' antes de crear al estudiante.");
       return;
     }
 
@@ -284,7 +285,7 @@ export const useEstudiantes = () => {
     const token = localStorage.getItem('token');
 
     try {
-      const respuesta = await fetch('http://127.0.0.1:8000/estudiante', {
+      const respuesta = await fetch(`${API_URL}/estudiante`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -292,7 +293,7 @@ export const useEstudiantes = () => {
         },
         body: JSON.stringify(nuevoEstudiante),
       });
-      if (!respuesta.ok) throw new Error('Error al guardar. Verifica que el RUT/IPE no esté duplicado en la base de datos.');
+      if (!respuesta.ok) throw new Error('Error al guardar. Verifica que el RUT/IPE no estÃ© duplicado en la base de datos.');
       
       setRutRecienCreado(nuevoEstudiante.run);
       setEstudianteCreadoExito(true);

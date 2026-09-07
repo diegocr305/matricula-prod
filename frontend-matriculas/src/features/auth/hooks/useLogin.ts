@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../../../config/api';
 
 export const useLogin = () => {
   const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ export const useLogin = () => {
     setCargando(true);
 
     try {
-      const respuesta = await fetch('http://127.0.0.1:8000/login', {
+      const respuesta = await fetch(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, rol })
@@ -24,7 +25,7 @@ export const useLogin = () => {
 
       const datos = await respuesta.json();
 
-      if (!respuesta.ok) throw new Error(datos.detail || 'Error al iniciar sesión');
+      if (!respuesta.ok) throw new Error(datos.detail || 'Error al iniciar sesiÃ³n');
 
       localStorage.setItem('token', datos.access_token);
       localStorage.setItem('usuario', JSON.stringify(datos.usuario));
@@ -42,7 +43,7 @@ export const useLogin = () => {
     setCargando(true);
 
     try {
-      const respuesta = await fetch('http://127.0.0.1:8000/login/google', {
+      const respuesta = await fetch(`${API_URL}/login/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -53,7 +54,7 @@ export const useLogin = () => {
 
       const datos = await respuesta.json();
 
-      if (!respuesta.ok) throw new Error(datos.detail || 'Error al iniciar sesión con Google');
+      if (!respuesta.ok) throw new Error(datos.detail || 'Error al iniciar sesiÃ³n con Google');
 
       localStorage.setItem('token', datos.access_token);
       localStorage.setItem('usuario', JSON.stringify(datos.usuario));
