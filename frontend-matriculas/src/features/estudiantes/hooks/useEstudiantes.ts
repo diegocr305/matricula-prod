@@ -270,10 +270,15 @@ export const useEstudiantes = () => {
         body: JSON.stringify(datosEdicion),
       });
 
-      if (!respuesta.ok) throw new Error('Error al actualizar los datos');
+      if (!respuesta.ok) {
+        const errorData = await respuesta.json();
+        throw new Error(`Error de validación: ${JSON.stringify(errorData.detail || errorData)}`);
+      }
 
       await verFichaEstudiante(datosEstudiante.personal.run);
       setModoEdicion(false);
+      alert("Estudiante actualizado correctamente.");
+      
     } catch (err: any) {
       alert(err.message);
     } finally {

@@ -8,7 +8,8 @@ export const useInicio2 = () => {
     total_activos: 0,
     total_inactivos: 0,
     por_nivel: [],
-    por_curso: []
+    por_curso: [],
+    historico: [] as any[] // 
   });
   
   const [cargando, setCargando] = useState(true);
@@ -40,7 +41,7 @@ export const useInicio2 = () => {
         return res.json();
       })
       .then(data => {
-        setEstadisticas(data);
+        setEstadisticas(data); // Aquí ahora también se guardará la data de "historico"
         setCargando(false);
       })
       .catch(err => {

@@ -63,6 +63,7 @@ export const useMatriculas = () => {
   const [enviarApoderadoCurso, setEnviarApoderadoCurso] = useState(true);
   const [correoApoderadoCurso, setCorreoApoderadoCurso] = useState('');
   const [descargarLocalCurso, setDescargarLocalCurso] = useState(false);
+  const [descargandoExcel, setDescargandoExcel] = useState(false);
 
   const [cursoActual, setCursoActual] = useState('');
   const [advertenciaNivel, setAdvertenciaNivel] = useState<string | null>(null);
@@ -263,20 +264,59 @@ export const useMatriculas = () => {
   }, [matriculas, busqueda, filtroCodigo, filtroCurso, ordenFolio, ordenEstado]);
 
   // ============================================================================
-  // ðŸŒŸ NUEVO: LÃ“GICA DE INDICADOR INTELIGENTE DE CUPOS (45 ALUMNOS)
   // ============================================================================
-  const LIMITE_CUPOS = 45;
-  
-  // Solo se mostrarÃ¡ el cuadro informativo si los 3 filtros principales estÃ¡n seleccionados
+  // LÓGICA DINÁMICA DE CAPACIDAD DE SALA (Conectada a la BD)
+  // ============================================================================
+  const LIMITE_CUPOS = 45; // fallback por defecto
+  const [capacidadSala, setCapacidadSala] = useState<number>(45);
+
+  const formatearNivelExcel = (cursoStr: string) => {
+    if (!cursoStr) return "";
+    const texto = cursoStr.toUpperCase();
+    const numero = texto.match(/\d+/)?.[0] || "";
+
+    if (texto.includes('MEDIO') || texto.includes('MEDIA')) return `${numero}MEDIO`;
+    if (texto.includes('BÁSICO') || texto.includes('BASICO')) return `${numero}BASICO`;
+    if (texto.includes('KINDER') || texto.includes('KÍNDER')) {
+      return texto.includes('PRE') ? 'PREKINDER' : 'KINDER';
+    }
+    return texto.replace(/[^A-Z0-9]/g, '');
+  };
+
+  useEffect(() => {
+    const obtenerCapacidad = async () => {
+      // No aplica con "Todos los años" (los cupos son por año-curso específico)
+      if (!colegioSeleccionado || !filtroAnio || filtroAnio === 'todos' || !filtroCurso || matriculas.length === 0) {
+        setCapacidadSala(45);
+        return;
+      }
+      const rbdReal = matriculas[0].rbd;
+      const nivelExcel = formatearNivelExcel(filtroCurso);
+      const token = localStorage.getItem('token');
+      try {
+        const url = `${API_URL}/establecimientos/capacidad-sala?rbd=${rbdReal}&anio_escolar=${filtroAnio}&nivel=${nivelExcel}`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+          const data = await res.json();
+          setCapacidadSala(data.capacidad_maxima);
+        } else {
+          setCapacidadSala(45);
+        }
+      } catch (e) {
+        console.error("Error obteniendo capacidad:", e);
+        setCapacidadSala(45);
+      }
+    };
+    obtenerCapacidad();
+  }, [colegioSeleccionado, filtroAnio, filtroCurso, matriculas]);
+
   // Cupos son por año-curso específico: no aplica con "Todos los años" ni sin año.
   const mostrarCupos = filtroAnio !== '' && filtroAnio !== 'todos' && filtroCodigo !== '' && filtroCurso !== '';
 
   const cuposOcupados = useMemo(() => {
     if (!mostrarCupos) return 0;
-    // Solo contamos las matrÃ­culas que estÃ¡n activas dentro del curso que ya filtramos arriba
     return matriculasProcesadas.filter(m => m.estado === 'Activa').length;
   }, [matriculasProcesadas, mostrarCupos]);
-  // ============================================================================
 
   const abrirModalEmision = (idMatricula: number, tipo: 'MATRICULA' | 'RETIRO' | 'CAMBIO_CURSO') => {
     const matricula = matriculas.find(m => m.id_matricula === idMatricula);
@@ -403,6 +443,49 @@ export const useMatriculas = () => {
     }
   };
 
+  const exportarAExcel = async () => {
+    if (!colegioSeleccionado) return;
+    setDescargandoExcel(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Armar la URL con los parámetros de filtro actuales
+      let url = `${API_URL}/matriculas/exportar-excel?establecimiento_id=${colegioSeleccionado}`;
+      if (filtroAnio && filtroAnio !== 'todos') url += `&anio=${filtroAnio}`;
+      if (filtroCodigo) url += `&codigo_plan=${filtroCodigo}`;
+
+      const respuesta = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!respuesta.ok) throw new Error('Error al generar el archivo Excel.');
+
+      // Convertir la respuesta a un Blob (archivo binario)
+      const blob = await respuesta.blob();
+      const urlBlob = window.URL.createObjectURL(blob);
+      
+      // Forzar la descarga en el navegador
+      const linkDescarga = document.createElement('a');
+      linkDescarga.href = urlBlob;
+      linkDescarga.download = `Registro_Matriculas_${colegioSeleccionado}.xlsx`;
+      document.body.appendChild(linkDescarga);
+      linkDescarga.click();
+      
+      // Limpieza
+      linkDescarga.remove();
+      window.URL.revokeObjectURL(urlBlob);
+
+    } catch (err: any) {
+      alert("Hubo un error al descargar el Excel: " + err.message);
+    } finally {
+      setDescargandoExcel(false);
+    }
+  };
+
   useEffect(() => {
     const advertencias: string[] = [];
 
@@ -433,6 +516,7 @@ export const useMatriculas = () => {
           advertencias.push(`â€¢ EstÃ¡ cambiando el nivel del curso de '${cursoActual}' a '${cursoDestino}'.`);
         }
       }
+      
     }
 
     if (advertencias.length > 0) {
@@ -469,6 +553,7 @@ export const useMatriculas = () => {
     datosEmision,
     aniosUnicos, codigosUnicos, cursosUnicos, estructuraColegio, matriculasProcesadas,
     manejarSubidaCSV, abrirModalEmision, iniciarRetiro, confirmarRetiro, iniciarCambioCurso, confirmarCambioCurso,
-    mostrarCupos, cuposOcupados, LIMITE_CUPOS // ðŸŒŸ AÃ±adimos las nuevas variables al return
+    mostrarCupos, cuposOcupados, LIMITE_CUPOS,
+    descargandoExcel, exportarAExcel, capacidadSala
   };
 };

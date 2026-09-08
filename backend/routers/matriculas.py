@@ -1,12 +1,12 @@
 # routers/matriculas.py
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
 from pydantic import BaseModel
-
 from schemas import MatriculaCreate, MatriculaUpdate, CuestionarioRetiro
 from security import obtener_usuario_actual, verificar_escritura
 from services import matricula_service
+from services.matricula_service import exportar_matriculas_excel_service
 
 router = APIRouter(prefix="/matriculas", tags=["Matrículas"])
 
@@ -73,3 +73,29 @@ async def carga_masiva_sige(archivos: List[UploadFile] = File(...), usuario_actu
 @router.get("/procedencia/{rut_estudiante}")
 def obtener_colegio_procedencia(rut_estudiante: str):
     return matricula_service.obtener_colegio_procedencia_db(rut_estudiante)
+
+@router.get("/exportar-excel")
+async def exportar_matriculas_excel(
+    establecimiento_id: int,
+    anio: str = Query(None),
+    codigo_plan: str = Query(None)
+    # usuario = Depends(obtener_usuario_actual) # Descomentar si requieres token de sesión
+):
+    """
+    Endpoint para descargar el registro general de matrículas en formato .xlsx
+    """
+    # Delegamos toda la lógica al servicio
+    buffer = exportar_matriculas_excel_service(
+        id_establecimiento=establecimiento_id,
+        anio=anio,
+        codigo_plan=codigo_plan
+    )
+    # Preparamos las cabeceras HTTP para forzar la descarga del archivo en el navegador
+    headers = {
+        'Content-Disposition': f'attachment; filename="Reporte_Matriculas_Establecimiento_{establecimiento_id}.xlsx"'
+    }
+    return StreamingResponse(
+        buffer, 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+        headers=headers
+    )

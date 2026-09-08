@@ -40,7 +40,7 @@ export const useAuditoria = () => {
     if (fechaInicio) params.append('fecha_inicio', fechaInicio);
     if (fechaFin) params.append('fecha_fin', fechaFin);
 
-    const url = `${API_URL}/reportes/auditoria-matriculas?${params.toString()}`;
+    const url = `${API_URL}/reporte/auditoria-matriculas?${params.toString()}`;
 
     fetch(url, {
       method: 'GET',

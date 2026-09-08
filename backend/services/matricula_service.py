@@ -3,6 +3,7 @@ import io
 import pandas as pd
 import hashlib
 from datetime import datetime
+import openpyxl
 from fastapi import HTTPException
 from database import get_db_connection
 
@@ -555,4 +556,69 @@ def obtener_colegio_procedencia_db(rut_estudiante: str):
         }
     finally:
         cursor.close()
+        conn.close()
+        
+def exportar_matriculas_excel_service(id_establecimiento: int, anio: str = None, codigo_plan: str = None):
+    """
+    Extrae las matrículas según los filtros aplicados y genera un archivo Excel (.xlsx) en memoria.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 1. Construir la consulta SQL dinámicamente según los filtros
+        query = """
+            SELECT m.numero_correlativo, m.anio_escolar, m.estado, m.fecha_matricula,
+                   m.nivel_ensenanza, m.curso, m.letra_curso, m.cod_tipo_ensenanza,
+                   e.run_ipe, e.nombres, e.apellido_paterno, e.apellido_materno, e.sexo, e.domicilio,
+                   a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno, a.telefono, a.correo_electronico
+            FROM matricula m
+            INNER JOIN estudiante e ON m.id_estudiante = e.id_estudiante
+            LEFT JOIN apoderado a ON e.id_apoderado_principal = a.id_apoderado
+            WHERE m.id_establecimiento = %s
+        """
+        params = [id_establecimiento]
+        
+        # Inyectar filtros de forma segura si el usuario los seleccionó
+        if anio:
+            query += " AND m.anio_escolar = %s"
+            params.append(int(anio))
+        if codigo_plan:
+            query += " AND m.cod_tipo_ensenanza = %s"
+            params.append(int(codigo_plan))
+            
+        query += " ORDER BY m.anio_escolar DESC, m.curso ASC, e.apellido_paterno ASC"
+        
+        cur.execute(query, tuple(params))
+        filas = cur.fetchall()
+
+        # 2. Crear el archivo Excel en memoria
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Registro de Matrículas"
+
+        # 3. Definir los encabezados (Toda la información cruzada)
+        encabezados = [
+            "N° Correlativo", "Año Escolar", "Estado", "Fecha Matrícula", "Nivel", "Curso", "Letra", "Cód. Enseñanza",
+            "RUT/IPE Estudiante", "Nombres Estudiante", "Ap. Paterno Est.", "Ap. Materno Est.", "Sexo", "Domicilio Est.",
+            "RUT/IPA Apoderado", "Nombres Apoderado", "Ap. Paterno Apod.", "Ap. Materno Apod.", "Teléfono", "Correo"
+        ]
+        ws.append(encabezados)
+
+        # 4. Llenar los datos extraídos de la BD
+        for fila in filas:
+            ws.append(fila)
+
+        # 5. Guardar en un buffer de memoria para no crear archivos temporales en el disco
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        return buffer
+
+    except Exception as e:
+        print(f"Error generando Excel: {e}")
+        raise HTTPException(status_code=500, detail="Error interno al generar el archivo Excel.")
+    finally:
+        cur.close()
         conn.close()

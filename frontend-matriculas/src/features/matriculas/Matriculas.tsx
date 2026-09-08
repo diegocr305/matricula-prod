@@ -23,7 +23,7 @@ export default function Matriculas() {
     modalEmisionAbierto, setModalEmisionAbierto, datosEmision,
     manejarSubidaCSV, abrirModalEmision, iniciarRetiro, confirmarRetiro, 
     iniciarCambioCurso, confirmarCambioCurso,
-    mostrarCupos, cuposOcupados, LIMITE_CUPOS // 🌟 Variables extraídas del hook
+    mostrarCupos, cuposOcupados, capacidadSala,descargandoExcel, exportarAExcel
   } = useMatriculas();
 
   return (
@@ -31,8 +31,18 @@ export default function Matriculas() {
       
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-800">Registro de Matrículas</h1>
-        
         <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={exportarAExcel}
+            disabled={descargandoExcel || matriculasProcesadas.length === 0}
+            className={`flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors border ${
+            descargandoExcel || matriculasProcesadas.length === 0
+            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+            : 'bg-white text-[#006BB9] border-[#006BB9] hover:bg-blue-50'
+             }`}
+                 >
+             {descargandoExcel ? 'Generando Excel...' : '📊 Descargar Excel'}
+         </button>
           {puedeEditar && (
             <>
               <input 
@@ -116,14 +126,14 @@ export default function Matriculas() {
             {/* Lógica Condicional: Se muestra solo cuando los 3 filtros están seleccionados */}
             {mostrarCupos && (
               <div className={`flex items-center gap-3 px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-                cuposOcupados >= LIMITE_CUPOS 
+                cuposOcupados >= capacidadSala
                   ? 'bg-red-100 text-red-700 border-red-200' 
                   : 'bg-blue-100 text-blue-700 border-blue-200'
               }`}>
                 <span>👥 Ocupación en sala:</span>
-                <span className="text-sm">{cuposOcupados} / {LIMITE_CUPOS}</span>
+                <span className="text-sm">{cuposOcupados} / {capacidadSala}</span>
                 
-                {cuposOcupados >= LIMITE_CUPOS && (
+                {cuposOcupados >= capacidadSala && (
                   <span className="ml-2 uppercase bg-red-600 text-white px-2 py-0.5 rounded-full text-[10px] tracking-wider animate-pulse">
                     Límite Legal Alcanzado
                   </span>

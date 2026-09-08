@@ -80,34 +80,82 @@ export const useNuevaMatricula = () => {
   const [checkCertRetiro, setCheckCertRetiro] = useState(false);
   const [idEstablecimientoPrevio, setIdEstablecimientoPrevio] = useState<string | null>(null);
 
+// ============================================================================
+  // LÓGICA DINÁMICA DE CONTROL DE CUPOS MÁXIMOS (Conectado a BD/Excel)
   // ============================================================================
-  // ðŸŒŸ NUEVO: LÃ“GICA DE CONTROL DE CUPOS MÃXIMOS (45 ESTUDIANTES)
-  // ============================================================================
-  const LIMITE_CUPOS = 45;
+  
+  // 1. Estado para guardar el límite dinámico (45 por defecto como fallback normativo)
+  const [limiteCupos, setLimiteCupos] = useState<number>(45);
 
+  // 2. Función traductora: Convierte "1° Medio A" a "1MEDIO" para que coincida con el Excel
+  const formatearNivelExcel = (cursoStr: string) => {
+    const texto = cursoStr.toUpperCase();
+    const numero = texto.match(/\d+/)?.[0] || "";
+    
+    if (texto.includes('MEDIO') || texto.includes('MEDIA')) return `${numero}MEDIO`;
+    if (texto.includes('BÁSICO') || texto.includes('BASICO')) return `${numero}BASICO`;
+    if (texto.includes('KINDER') || texto.includes('KÍNDER')) {
+      return texto.includes('PRE') ? 'PREKINDER' : 'KINDER';
+    }
+    return texto.replace(/[^A-Z0-9]/g, ''); // Fallback de seguridad
+  };
+
+  // 3. Efecto: Consulta al backend la capacidad real cuando cambia el curso o colegio
+  useEffect(() => {
+    const obtenerCapacidadDinamica = async () => {
+      if (!formulario.id_establecimiento || !formulario.cursoSeleccionado) {
+        setLimiteCupos(45);
+        return;
+      }
+
+      // Buscar el RBD del colegio seleccionado
+      const colegio = establecimientosDb.find(e => String(e.id_establecimiento) === String(formulario.id_establecimiento));
+      if (!colegio) return;
+
+      const nivelExcel = formatearNivelExcel(formulario.cursoSeleccionado);
+      const token = localStorage.getItem('token');
+
+      try {
+        const res = await fetch(`${API_URL}/establecimientos/capacidad-sala?rbd=${colegio.rbd}&anio_escolar=${formulario.anio_escolar}&nivel=${nivelExcel}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setLimiteCupos(data.capacidad_maxima);
+        } else {
+          setLimiteCupos(45); // Si falla la consulta, mantenemos el límite legal de 45
+        }
+      } catch (e) {
+        console.error("Error al obtener la capacidad dinámica:", e);
+        setLimiteCupos(45);
+      }
+    };
+
+    obtenerCapacidadDinamica();
+  }, [formulario.id_establecimiento, formulario.anio_escolar, formulario.cursoSeleccionado, establecimientosDb]);
+
+  // 4. Conteo de ocupación (mantenemos la lógica, pero ahora compararemos con 'limiteCupos')
   const cuposOcupados = useMemo(() => {
     if (!formulario.id_establecimiento || !formulario.cod_tipo_ensenanza || !formulario.cursoSeleccionado) return 0;
     
-    // Filtramos cruzando todos los datos para dar con el curso exacto
     return todasLasMatriculas.filter(m =>
       String(m.id_establecimiento) === String(formulario.id_establecimiento) &&
       String(m.anio_escolar) === String(formulario.anio_escolar) &&
       String(m.cod_tipo_ensenanza) === String(formulario.cod_tipo_ensenanza) &&
       m.curso === formulario.cursoSeleccionado &&
-      (m.estado === 'Activa' || !m.estado) // Solo contamos a los activos
+      (m.estado === 'Activa' || !m.estado)
     ).length;
   }, [formulario.id_establecimiento, formulario.anio_escolar, formulario.cod_tipo_ensenanza, formulario.cursoSeleccionado, todasLasMatriculas]);
 
-  // Si se llega al lÃ­mite, forzamos que sea excedente automÃ¡ticamente
+  // 5. Bloqueo de excedente automático usando el límite dinámico
   useEffect(() => {
-    if (cuposOcupados >= LIMITE_CUPOS) {
+    if (cuposOcupados >= limiteCupos) {
       setFormulario(prev => ({ ...prev, es_excedente: true }));
     } else {
-      // Si cambia a un curso vacÃ­o, le quitamos el excedente automÃ¡tico por precauciÃ³n
       setFormulario(prev => ({ ...prev, es_excedente: false }));
     }
-  }, [cuposOcupados]);
-  // ============================================================================
+  }, [cuposOcupados, limiteCupos]);
 
   useEffect(() => {
     if (esPerfilColegio && usuario?.id_establecimiento) {
@@ -539,6 +587,6 @@ export const useNuevaMatricula = () => {
     establecimientosDb, formulario, checkCertNotas, setCheckCertNotas, checkCertRetiro, setCheckCertRetiro,
     idEstablecimientoPrevio, codigosDisponibles, cursosDisponibles, 
     seleccionarCurso, handleEscribirBuscador, seleccionarEstudiante, guardarDatosFaltantes, copiarDomicilio, handleChange, generarComprobantePDF, handleSubmit, setCursoPrevio, setCodigoPrevio, setIdEstablecimientoPrevio,
-    esColegioEMTP, esCuartoMedio, cuposOcupados, LIMITE_CUPOS // ðŸŒŸ AÃ±adido al return
+    esColegioEMTP, esCuartoMedio, cuposOcupados, limiteCupos // 🌟 Añadido al return
   };
 };

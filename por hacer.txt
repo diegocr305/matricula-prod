@@ -1,6 +1,4 @@
-* Dar la opcion de poder contar la cantidad de matriculados que hay en cada curso para el tema de los
-alumnos excedentes
-    Ya existe pero poder llevarlo al registro de matriculas y asi que la cantidad sea mas visible
+* REvisar la exportacion para que se haga por curso y no todos los cursos pertenecientes a un codigo
 
 *SAcar los Jardines del sistema
 
@@ -19,6 +17,21 @@ alumnos excedentes
     columnas nuevas o en un JSON, y si aplican al estudiante, al apoderado o ambos.
     PENDIENTE: por eso hoy el campo "domicilio" del apoderado en la ficha quedo deshabilitado
     de guardado hasta rediseñar este modelo.
+
+--- Tareas reportadas por el practicante (Bastian) ---
+
+* agregar para que se guarde los documentos al ingreso de matriculas y ver a que base de datos se guardaran los
+documentos
+
+* el comprobante de matricula: el boton de mandar por correo no funciona, solo el de la descarga
+
+* No aparece en la trazabilidad cuando se cambia un dato del estudiante
+
+* (RESUELTO) Cambiar que al poner la lista en los años se cambia y luego debo de seleccionar todos los años para
+poder seleccionar los otros años  -> ya implementado: por defecto carga el ultimo año con datos,
+selector con años + opcion "Todos los años" (filtrado en backend).
+
+* cambiar dashboard mas estetico y desplegables
 
 
 Establecimientos que necesitan carga de datos 2026

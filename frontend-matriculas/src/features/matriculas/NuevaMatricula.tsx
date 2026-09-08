@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Search, UserCheck, AlertCircle, X, Copy, CheckCircle, Download, Mail, ArrowRight } from 'lucide-react';
 import { useNuevaMatricula } from './hooks/useNuevaMatricula';
 
@@ -18,7 +18,7 @@ export default function NuevaMatricula() {
     esColegioEMTP,esCuartoMedio,
     checkCertNotas, setCheckCertNotas, checkCertRetiro, setCheckCertRetiro,
     handleSubmit, generarComprobantePDF,
-    cuposOcupados, LIMITE_CUPOS // 🌟 Variables traídas del hook
+    cuposOcupados, limiteCupos // 🌟 Variables traídas del hook (límite dinámico desde BD)
   } = useNuevaMatricula();
 
   return (
@@ -192,14 +192,14 @@ export default function NuevaMatricula() {
                 <label className="block text-sm font-medium text-gray-700">Curso (Sala)</label>
                 {formulario.cursoSeleccionado && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm transition-colors ${
-                    cuposOcupados >= LIMITE_CUPOS ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    cuposOcupados >= limiteCupos ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
                   }`}>
-                    Cupos: {cuposOcupados} / {LIMITE_CUPOS}
+                    Cupos: {cuposOcupados} / {limiteCupos}
                   </span>
                 )}
               </div>
               <select name="cursoSeleccionado" value={formulario.cursoSeleccionado} onChange={(e) => seleccionarCurso(e.target.value)} required className={`w-full border rounded-lg p-2 outline-none font-bold transition-colors ${
-                cuposOcupados >= LIMITE_CUPOS ? 'border-red-300 text-red-800 bg-red-50' : 'border-gray-300 text-blue-800 bg-white'
+                cuposOcupados >= limiteCupos ? 'border-red-300 text-red-800 bg-red-50' : 'border-gray-300 text-blue-800 bg-white'
               }`}>
                 {cursosDisponibles.length === 0 ? (
                   <option value="">Seleccione un plan primero</option>
@@ -288,7 +288,7 @@ export default function NuevaMatricula() {
               Condición de Matrícula
             </h4>
             
-            <div className={`p-4 rounded-lg border transition-colors ${formulario.es_excedente ? (cuposOcupados >= LIMITE_CUPOS ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200') : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`p-4 rounded-lg border transition-colors ${formulario.es_excedente ? (cuposOcupados >= limiteCupos ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200') : 'bg-gray-50 border-gray-200'}`}>
               
               <label className="flex items-start gap-3 cursor-pointer group">
                 <input 
@@ -296,20 +296,20 @@ export default function NuevaMatricula() {
                   name="es_excedente"
                   checked={formulario.es_excedente}
                   onChange={handleChange}
-                  disabled={cuposOcupados >= LIMITE_CUPOS} // Bloqueamos si llegó al límite
+                  disabled={cuposOcupados >= limiteCupos} // Bloqueamos si llegó al límite
                   className={`mt-1 w-4 h-4 rounded focus:ring-2 cursor-pointer transition-colors ${
-                    cuposOcupados >= LIMITE_CUPOS ? 'text-red-600 focus:ring-red-500 border-red-300' : 'text-orange-600 focus:ring-orange-500 border-gray-300'
+                    cuposOcupados >= limiteCupos ? 'text-red-600 focus:ring-red-500 border-red-300' : 'text-orange-600 focus:ring-orange-500 border-gray-300'
                   }`}
                 />
                 <div>
                   <p className={`text-sm font-bold transition-colors ${
-                    cuposOcupados >= LIMITE_CUPOS ? 'text-red-900' : (formulario.es_excedente ? 'text-orange-900' : 'text-gray-800 group-hover:text-orange-700')
+                    cuposOcupados >= limiteCupos ? 'text-red-900' : (formulario.es_excedente ? 'text-orange-900' : 'text-gray-800 group-hover:text-orange-700')
                   }`}>
                     Matricular como Estudiante Excedente (Sobrecupo)
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {cuposOcupados >= LIMITE_CUPOS 
-                      ? <span className="text-red-600 font-bold">⚠️ El curso ha alcanzado su máxima capacidad legal ({LIMITE_CUPOS}). Esta opción es obligatoria para continuar.</span>
+                    {cuposOcupados >= limiteCupos 
+                      ? <span className="text-red-600 font-bold">⚠️ El curso ha alcanzado su máxima capacidad legal ({limiteCupos}). Esta opción es obligatoria para continuar.</span>
                       : "Seleccione esta opción solo si el estudiante ingresa por sobre el cupo máximo autorizado mediante resolución ministerial."
                     }
                   </p>
