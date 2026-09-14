@@ -181,3 +181,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Datos sensibles / PII (no versionar): planillas reales de estudiantes,
+# direcciones, RGM, declaracion de cupos, etc. Se cargan manualmente.
+csv pruebas/*.xlsx
+csv pruebas/*.xls
+# Scripts temporales de carga/analisis de datos (no versionar)
+csv pruebas/_*.py
