@@ -37,6 +37,13 @@ class CrearEstudianteRequest(BaseModel):
 
 
 class ActualizarEstudianteRequest(BaseModel):
+    # Dirección estructurada del estudiante (fuente de verdad).
+    # domicilio_estudiante se mantiene por compatibilidad; si vienen los campos
+    # estructurados, el backend recompone domicilio a partir de ellos.
+    calle: Optional[str] = None
+    numero: Optional[str] = None
+    sector: Optional[str] = None
+    comuna: Optional[str] = None
     domicilio_estudiante: Optional[str] = ""
     rut_apoderado: Optional[str] = ""
     nombres_apoderado: Optional[str] = ""

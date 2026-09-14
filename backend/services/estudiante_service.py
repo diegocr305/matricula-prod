@@ -3,6 +3,21 @@ from fastapi import HTTPException
 from database import get_db_connection
 import json
 
+
+def componer_domicilio(calle, numero, sector, comuna):
+    """Arma el string de domicilio a partir de los campos estructurados.
+    Es la representación canónica/legada de la dirección; los campos
+    estructurados (calle/numero/sector/comuna) son la fuente de verdad.
+    Formato: "<calle> <numero>, <sector>, <comuna>" saltando los vacíos."""
+    calle = (calle or "").strip()
+    numero = (numero or "").strip()
+    sector = (sector or "").strip()
+    comuna = (comuna or "").strip()
+
+    linea1 = " ".join(p for p in (calle, numero) if p).strip()
+    partes = [p for p in (linea1, sector, comuna) if p]
+    return ", ".join(partes)
+
 def obtener_estudiantes_db(establecimiento_id: int = None, rol: str = None):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -40,7 +55,8 @@ def obtener_ficha_estudiante_db(rut: str):
     try:
         cur.execute("""
             SELECT e.id_estudiante, e.run_ipe, e.nombres, e.apellido_paterno, e.apellido_materno, e.fecha_nacimiento, e.domicilio,
-                   a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno, a.telefono, a.correo_electronico
+                   a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno, a.telefono, a.correo_electronico,
+                   e.calle, e.numero, e.sector, e.comuna
             FROM estudiante e
             LEFT JOIN apoderado a ON e.id_apoderado_principal = a.id_apoderado
             WHERE e.run_ipe = %s
@@ -70,6 +86,11 @@ def obtener_ficha_estudiante_db(rut: str):
                 "apellidos": f"{estudiante_db[3]} {estudiante_db[4]}",
                 "fecha_nacimiento": str(estudiante_db[5]) if estudiante_db[5] else "No registrada",
                 "domicilio": estudiante_db[6] if estudiante_db[6] else "Sin registrar",
+                # Dirección estructurada (fuente de verdad para la edición y la geocodificación futura)
+                "calle": estudiante_db[13] or "",
+                "numero": estudiante_db[14] or "",
+                "sector": estudiante_db[15] or "",
+                "comuna": estudiante_db[16] or "",
                 "rbd_actual": ultimo_rbd,
                 "colegio_actual": ultimo_colegio
             },
@@ -184,24 +205,94 @@ def buscar_apoderado_por_rut_db(rut_apoderado: str):
         conn.close()
 
 
+def _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nueva):
+    """Registra en auditoria_matricula el cambio de datos de la ficha del estudiante,
+    guardando los valores reales anteriores y nuevos (jsonb). Se vincula a la
+    matrícula más reciente del alumno. Si no hay matrícula, no registra (la FK lo exige)."""
+    cur.execute(
+        """
+        SELECT id_matricula FROM matricula
+        WHERE id_estudiante = (SELECT id_estudiante FROM estudiante WHERE run_ipe = %s)
+        ORDER BY id_matricula DESC LIMIT 1
+        """,
+        (rut,),
+    )
+    mat_result = cur.fetchone()
+    if not mat_result:
+        return
+
+    id_matricula = mat_result[0]
+    datos_ant = json.dumps({"direccion": dir_anterior}, ensure_ascii=False, default=str)
+    datos_nuev = json.dumps({"direccion": dir_nueva}, ensure_ascii=False, default=str)
+    # 'accion' es varchar(10); usamos 'UPDATE' (consistente con el resto del sistema).
+    # El detalle (edición de ficha/dirección) queda en los jsonb datos_anteriores/nuevos.
+    cur.execute(
+        """
+        INSERT INTO auditoria_matricula (id_matricula, accion, id_usuario, datos_anteriores, datos_nuevos)
+        VALUES (%s, 'UPDATE', %s, %s, %s)
+        """,
+        (id_matricula, id_usuario, datos_ant, datos_nuev),
+    )
+
+
 def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # 1. Domicilio del estudiante
+        # 0. Leemos los valores ANTERIORES de la dirección (para la auditoría real).
         cur.execute(
-            "UPDATE estudiante SET domicilio = %s WHERE run_ipe = %s RETURNING id_apoderado_principal",
-            (req.domicilio_estudiante, rut),
+            "SELECT id_apoderado_principal, calle, numero, sector, comuna, domicilio "
+            "FROM estudiante WHERE run_ipe = %s",
+            (rut,),
         )
-        resultado = cur.fetchone()
-        if not resultado:
+        prev = cur.fetchone()
+        if not prev:
             raise HTTPException(status_code=404, detail="Estudiante no encontrado")
-        id_apoderado_actual = resultado[0]
+        id_apoderado_actual = prev[0]
+        dir_anterior = {
+            "calle": prev[1], "numero": prev[2], "sector": prev[3],
+            "comuna": prev[4], "domicilio": prev[5],
+        }
+
+        # 1. Dirección del estudiante.
+        # Si vienen los campos estructurados, son la fuente de verdad y recomponemos
+        # el domicilio a partir de ellos. Si no (compatibilidad), usamos domicilio_estudiante.
+        usa_estructurado = any(
+            getattr(req, campo, None) is not None
+            for campo in ("calle", "numero", "sector", "comuna")
+        )
+
+        if usa_estructurado:
+            calle = (req.calle or "").strip() or None
+            numero = (req.numero or "").strip() or None
+            sector = (req.sector or "").strip() or None
+            comuna = (req.comuna or "").strip() or None
+            domicilio_final = componer_domicilio(calle, numero, sector, comuna)
+            cur.execute(
+                "UPDATE estudiante SET calle = %s, numero = %s, sector = %s, comuna = %s, "
+                "domicilio = %s WHERE run_ipe = %s",
+                (calle, numero, sector, comuna, domicilio_final, rut),
+            )
+        else:
+            domicilio_final = req.domicilio_estudiante
+            cur.execute(
+                "UPDATE estudiante SET domicilio = %s WHERE run_ipe = %s",
+                (domicilio_final, rut),
+            )
+
+        dir_nueva = {
+            "calle": req.calle if usa_estructurado else dir_anterior["calle"],
+            "numero": req.numero if usa_estructurado else dir_anterior["numero"],
+            "sector": req.sector if usa_estructurado else dir_anterior["sector"],
+            "comuna": req.comuna if usa_estructurado else dir_anterior["comuna"],
+            "domicilio": domicilio_final,
+        }
 
         rut_nuevo = (req.rut_apoderado or "").strip()
 
         # Si no se envió RUT de apoderado, no tocamos el apoderado.
         if not rut_nuevo:
+            _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nueva)
             conn.commit()
             return {"mensaje": "Datos actualizados exitosamente"}
 
@@ -265,23 +356,8 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
                 )
                 mensaje = "Apoderado creado y vinculado."
 
-        # --- Trazabilidad: registrar el cambio en la bitacora (aporte del practicante) ---
-        # Buscamos la matricula mas reciente del alumno para vincular el evento.
-        cur.execute("""
-            SELECT id_matricula FROM matricula
-            WHERE id_estudiante = (SELECT id_estudiante FROM estudiante WHERE run_ipe = %s)
-            ORDER BY id_matricula DESC LIMIT 1
-        """, (rut,))
-        mat_result = cur.fetchone()
-
-        if mat_result:
-            id_matricula = mat_result[0]
-            datos_ant = json.dumps({"Ficha_Personal": "Datos Anteriores"})
-            datos_nuev = json.dumps({"Ficha_Personal": "Datos Actualizados"})
-            cur.execute("""
-                INSERT INTO auditoria_matricula (id_matricula, accion, id_usuario, datos_anteriores, datos_nuevos)
-                VALUES (%s, 'UPDATE', %s, %s, %s)
-            """, (id_matricula, id_usuario, datos_ant, datos_nuev))
+        # --- Trazabilidad: registrar el cambio real en la bitácora ---
+        _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nueva)
 
         conn.commit()
         return {"mensaje": mensaje}

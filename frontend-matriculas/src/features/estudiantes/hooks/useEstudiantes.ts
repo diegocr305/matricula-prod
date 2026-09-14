@@ -183,6 +183,12 @@ export const useEstudiantes = () => {
       
       setDatosEdicion({
         // Nombres de campos alineados con el backend (ActualizarEstudianteRequest)
+        // Dirección estructurada (fuente de verdad). domicilio_estudiante queda como
+        // compatibilidad; el backend recompone el domicilio desde estos campos.
+        calle: datos.personal.calle || '',
+        numero: datos.personal.numero || '',
+        sector: datos.personal.sector || '',
+        comuna: datos.personal.comuna || '',
         domicilio_estudiante: datos.personal.domicilio && datos.personal.domicilio !== 'Sin registrar' ? datos.personal.domicilio : '',
         rut_apoderado: datos.apoderado.rut_raw || '',
         nombres_apoderado: datos.apoderado.nombres || '',

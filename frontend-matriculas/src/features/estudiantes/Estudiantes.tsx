@@ -152,7 +152,26 @@ export default function Estudiantes() {
                 {!modoEdicion ? (
                   <p className="font-medium">{datosEstudiante.personal.domicilio}</p>
                 ) : (
-                  <input type="text" value={datosEdicion.domicilio} onChange={(e) => setDatosEdicion({...datosEdicion, domicilio: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Calle</label>
+                      <input type="text" placeholder="Ej: Av. Brasil" value={datosEdicion.calle || ''} onChange={(e) => setDatosEdicion({...datosEdicion, calle: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Número</label>
+                        <input type="text" placeholder="Ej: 1234" value={datosEdicion.numero || ''} onChange={(e) => setDatosEdicion({...datosEdicion, numero: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Sector / Cerro</label>
+                        <input type="text" placeholder="Ej: Cerro Alegre" value={datosEdicion.sector || ''} onChange={(e) => setDatosEdicion({...datosEdicion, sector: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Comuna</label>
+                      <input type="text" placeholder="Ej: Valparaíso" value={datosEdicion.comuna || ''} onChange={(e) => setDatosEdicion({...datosEdicion, comuna: e.target.value})} className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

@@ -188,3 +188,5 @@ csv pruebas/*.xlsx
 csv pruebas/*.xls
 # Scripts temporales de carga/analisis de datos (no versionar)
 csv pruebas/_*.py
+# CSVs de trabajo/revision con datos de estudiantes (PII)
+csv pruebas/*.csv
