@@ -185,7 +185,13 @@ export const useEstudiantes = () => {
         // Nombres de campos alineados con el backend (ActualizarEstudianteRequest)
         // Dirección estructurada (fuente de verdad). domicilio_estudiante queda como
         // compatibilidad; el backend recompone el domicilio desde estos campos.
-        calle: datos.personal.calle || '',
+        // Fallback: si el alumno no tiene la dirección separada en campos (solo el
+        // domicilio antiguo en un cuadro), precargamos ese texto en "calle" para que
+        // el usuario vea la dirección anterior y la pueda reorganizar, en vez de campos vacíos.
+        calle: datos.personal.calle
+          || (!datos.personal.numero && !datos.personal.sector && !datos.personal.comuna
+              && datos.personal.domicilio && datos.personal.domicilio !== 'Sin registrar'
+              ? datos.personal.domicilio : ''),
         numero: datos.personal.numero || '',
         sector: datos.personal.sector || '',
         comuna: datos.personal.comuna || '',
