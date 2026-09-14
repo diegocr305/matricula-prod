@@ -55,7 +55,7 @@ export default function Layout() {
              <Link to="/inicio" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/inicio') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
               <PieChart size={18} /> Panel de Control
             </Link>
-            
+
             {puedeVerAuditoria && (
               <Link to="/auditoria" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/auditoria') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
                <Activity size={18} /> Trazabilidad & Auditoría

@@ -16,8 +16,7 @@ export const useLayout = () => {
   const usuario = usuarioString ? JSON.parse(usuarioString) : null;
 
   const esPerfilGlobal = ['SLEP', 'admin_slep', 'Visualizador_SLEP'].includes(usuario?.rol);
-  const puedeVerAuditoria = !['Colegio', 'Visualizador_Colegio'].includes(usuario?.rol);
-
+  const puedeVerAuditoria = ['admin_slep', 'SLEP'].includes(usuario?.rol);
   const [colegioSeleccionado, setColegioSeleccionado] = useState<string>(
     !esPerfilGlobal ? String(usuario?.id_establecimiento) : ''
   );

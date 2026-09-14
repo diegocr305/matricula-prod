@@ -18,6 +18,11 @@ class MatriculaCreate(BaseModel):
     numero_resolucion_excedente: Optional[str] = None
     fecha_resolucion_excedente: Optional[date] = None
     es_alumno_practica: Optional[bool] = False
+    opcion_religion: str
+    acepta_compromiso: bool
+    autoriza_entrevista: bool
+    autoriza_imagen: bool
+    metodo_firma: str
     
 class MatriculaUpdate(BaseModel):
     estado: str
@@ -25,6 +30,7 @@ class MatriculaUpdate(BaseModel):
     motivo_retiro: Optional[str] = None
     observaciones: Optional[str] = None
     id_usuario_ejecutor: int 
+    correo_destino: Optional[str] = None
 
 class CuestionarioRetiro(BaseModel):
     rut_estudiante: str 

@@ -20,6 +20,7 @@ export interface NuevoEstudianteForm {
   domicilio_apoderado: string;
   telefono_apoderado: string;
   correo_apoderado: string;
+  relacion_estudiante: string;
   // Campos Migrantes Opcionales
   pais_origen_estudiante?: string;
   doc_extranjero_estudiante?: string;
@@ -74,13 +75,14 @@ export const useEstudiantes = () => {
   
   const [estudianteCreadoExito, setEstudianteCreadoExito] = useState(false);
   const [rutRecienCreado, setRutRecienCreado] = useState('');
+  const [archivoTutor, setArchivoTutor] = useState<File | null>(null);
 
   // ðŸŒŸ ESTADO INICIAL: Agregamos los campos de extranjerÃ­a
   const [nuevoEstudiante, setNuevoEstudiante] = useState<NuevoEstudianteForm>({
     run: '', nombres: '', apellido_paterno: '', apellido_materno: '', fecha_nacimiento: '', sexo: 'Masculino', domicilio: '', latitud:'', longitud:'',
     run_apoderado: '', nombres_apoderado: '', apellido_paterno_apoderado: '', apellido_materno_apoderado: '', domicilio_apoderado: '', telefono_apoderado: '', correo_apoderado: '',
     pais_origen_estudiante: '', doc_extranjero_estudiante: '',
-    pais_origen_apoderado: '', doc_extranjero_apoderado: ''
+    pais_origen_apoderado: '', doc_extranjero_apoderado: '',relacion_estudiante:''
   });
 
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -326,6 +328,12 @@ export const useEstudiantes = () => {
   const handleCrearEstudiante = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 🌟 VALIDACIÓN DEL TUTOR LEGAL
+    if (nuevoEstudiante.relacion_estudiante === 'Tutor Legal Designado' && !archivoTutor) {
+      alert("⚠️ Debe adjuntar el documento legal que acredite la tutoría del estudiante.");
+      return;
+    }
+
     const esIpeEstudiante = nuevoEstudiante.run.replace(/[^0-9kK]/g, '').length >= 10;
     const esIpaApoderado = nuevoEstudiante.run_apoderado.replace(/[^0-9kK]/g, '').length >= 10;
 
@@ -379,7 +387,7 @@ export const useEstudiantes = () => {
         run_apoderado: '', nombres_apoderado: '', apellido_paterno_apoderado: '', apellido_materno_apoderado: '', 
         domicilio_apoderado: '', telefono_apoderado: '', correo_apoderado: '',
         pais_origen_estudiante: '', doc_extranjero_estudiante: '',
-        pais_origen_apoderado: '', doc_extranjero_apoderado: ''
+        pais_origen_apoderado: '', doc_extranjero_apoderado: '',relacion_estudiante:''
       });
     } catch (err: any) {
       alert(err.message);
@@ -413,6 +421,6 @@ export const useEstudiantes = () => {
     buscarApoderadoPorRut, buscandoApoderado, avisoApoderado, setAvisoApoderado,
     estudianteCreadoExito, rutRecienCreado, cerrarModalExito, irAMatricular,
     nuevoEstudiante, setNuevoEstudiante, formatearRUT, handleCrearEstudiante,
-    creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion
+    creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion,archivoTutor, setArchivoTutor
   };
 };

@@ -20,8 +20,8 @@ export default function Inicio() {
         </p>
       </div>
 
-      {/* GRID DE BOTONES GIGANTES */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 🌟 GRID DINÁMICO: 4 columnas si es admin, 3 columnas si es colegio */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${puedeVerAuditoria ? 'lg:grid-cols-4' : 'lg:grid-cols-3 max-w-5xl mx-auto'}`}>
 
         {/* 1. BOTÓN MATRÍCULAS */}
         <Link to="/matriculas" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-900 hover:shadow-lg transition-all flex flex-col overflow-hidden">
@@ -74,9 +74,9 @@ export default function Inicio() {
           </div>
         </Link>
 
-        {/* 4. BOTÓN AUDITORÍA (Oculto para roles sin permiso) */}
+        {/* 4. BOTÓN AUDITORÍA (Oculto para colegios, visible para admin) */}
         {puedeVerAuditoria && (
-          <Link to="/auditoria" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-orange-600 hover:shadow-lg transition-all flex flex-col overflow-hidden lg:col-span-3 xl:col-span-1">
+          <Link to="/auditoria" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-orange-600 hover:shadow-lg transition-all flex flex-col overflow-hidden">
             <div className="p-6 flex-1">
               <div className="w-14 h-14 bg-orange-50 text-orange-700 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Activity size={32} />

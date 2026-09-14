@@ -6,10 +6,11 @@ export const useInicio2 = () => {
   const [estadisticas, setEstadisticas] = useState({
     anios_disponibles: [] as number[],
     total_activos: 0,
-    total_inactivos: 0,
+    total_inactivos: 0,    // 🌟 El total general de retiros
     por_nivel: [],
-    por_curso: [],
-    historico: [] as any[] // 
+    por_curso: [],         // 🌟 Desglose de alumnos activos
+    por_curso_retiros: [], // 🌟 NUEVO: Desglose de alumnos retirados/inactivos
+    historico: [] as any[] 
   });
   
   const [cargando, setCargando] = useState(true);
@@ -41,7 +42,9 @@ export const useInicio2 = () => {
         return res.json();
       })
       .then(data => {
-        setEstadisticas(data); // Aquí ahora también se guardará la data de "historico"
+        // 🌟 La data que viene del backend ahora llenará automáticamente 
+        // total_inactivos y por_curso_retiros si tu backend los envía.
+        setEstadisticas(data); 
         setCargando(false);
       })
       .catch(err => {

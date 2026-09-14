@@ -1,6 +1,8 @@
+
+-----------------Cambios pendientes---------------------------
 * REvisar la exportacion para que se haga por curso y no todos los cursos pertenecientes a un codigo
 
-*SAcar los Jardines del sistema
+*hacer que funcione el boton de enviar comprobante por correo
 
 * DOMICILIO GEO-REFERENCIADO (estudiante y/o apoderado)
     Rediseñar el campo de domicilio para poder geo-referenciar al alumno.
@@ -17,6 +19,16 @@
     columnas nuevas o en un JSON, y si aplican al estudiante, al apoderado o ambos.
     PENDIENTE: por eso hoy el campo "domicilio" del apoderado en la ficha quedo deshabilitado
     de guardado hasta rediseñar este modelo.
+
+*Revisar como es que deje funcionando el numero de folio y su integracion en la BD
+
+*hacer tabla con los motivos (tratar de cambiar la BD actual)
+sacar boton sige
+
+*Sacar boton de trazabilidad de la pagina de inicio
+
+*agregar mas informacion a la pestaña de estudiante pero se debe de completar el estudiante
+en la BD con esta nueva informacion
 
 --- Tareas reportadas por el practicante (Bastian) ---
 
@@ -48,3 +60,31 @@ RBD	Nombre	Tipo
 33437	Valparaniños	Jardín
 33441	Jardín Sala Cuna Pequeños Pasos	Jardín
 33442	Jardín Sala Cuna Volantín de Colores	Jardín
+
+-------------------------Cambios hechos----------------------------
+*creacion de tabla de asistencia_diaria en BD
+    agregar a establecimiento latitud y longitud
+
+*integrar seccion para guardar documento de resolucion de alumno excedente y
+completar esta informacion (Falta info)
+
+*Cambiar formulario de retiro o cambio a desplegables y que sea obligatorio guardar la informacion
+estudiante y que se pueda seleccionar mas de una de esas opciones
+(Revisar correo CArlos)
+
+* Cambiar boton trazabilidad para que solo aparezca a los admin
+
+*Aparece estadisticas de alumnos retirados
+
+*agregue dos tablas dentro de apoderado, relacion_estudiante y ruta_documento_tutor (validarlo pq
+quizas luego ese documento es mejor guardarlo no en la BD)
+
+*Hacer que en nuevo estudiante se genere una pregunta de quien va ser el apoderado
+ya sea padres, abuelos, designado por tutor o tutor( el documento del tutor se esta guardando en la BD)
+
+*cambiar que diga renovacion matricula y no nueva
+
+
+------------------------Nuevos cambios para proceso de matricula (idea)---------------------------------
+
+* agregar datos a la BD que vengan con opcion_religion,acepta_compromiso,autoriza_entrevista,autoriza_imagen,metodo_firma,estado_firma, ruta_sobre_digital.

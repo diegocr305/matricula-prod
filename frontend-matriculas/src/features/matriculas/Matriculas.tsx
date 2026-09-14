@@ -60,7 +60,7 @@ export default function Matriculas() {
                 {subiendoArchivo ? 'Procesando archivos...' : '📄 Cargar SIGE / CSV'}
               </label>
               <Link to="/matriculas/nueva" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                + Nueva Matrícula
+                + Renovar Matrícula
               </Link>
             </>
           )}

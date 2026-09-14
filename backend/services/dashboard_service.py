@@ -25,7 +25,7 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
             filtros_sql += " AND anio_escolar = %s"
             parametros.append(anio)
 
-        # 🌟 CORRECCIÓN 1: Obtener todos los años disponibles SIN filtrar por el año actual
+        # Obtener todos los años disponibles SIN filtrar por el año actual
         cur.execute(f"SELECT DISTINCT anio_escolar FROM matricula WHERE anio_escolar IS NOT NULL {filtro_global} ORDER BY anio_escolar DESC", tuple(param_global))
         anios_disponibles = [row[0] for row in cur.fetchall()]
 
@@ -39,10 +39,15 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
         cur.execute(f"SELECT nivel_ensenanza, COUNT(*) FROM matricula WHERE estado = 'Activa' {filtros_sql} GROUP BY nivel_ensenanza ORDER BY nivel_ensenanza", tuple(parametros))
         por_nivel = [{"nombre": row[0] or "Sin Nivel", "cantidad": row[1]} for row in cur.fetchall()]
 
+        # Desglose de cursos para ACTIVOS
         cur.execute(f"SELECT curso, COUNT(*) FROM matricula WHERE estado = 'Activa' {filtros_sql} GROUP BY curso ORDER BY curso", tuple(parametros))
         por_curso = [{"nombre": row[0] or "Sin Curso", "cantidad": row[1]} for row in cur.fetchall()]
 
-        # 🌟 CORRECCIÓN 2: Construir el Histórico Real desde 2022
+        # 🌟 NUEVO: Desglose de cursos para INACTIVOS (Retiros)
+        cur.execute(f"SELECT curso, COUNT(*) FROM matricula WHERE estado != 'Activa' {filtros_sql} GROUP BY curso ORDER BY curso", tuple(parametros))
+        por_curso_retiros = [{"nombre": row[0] or "Sin Curso", "cantidad": row[1]} for row in cur.fetchall()]
+
+        # --- CONSTRUCCIÓN DEL HISTÓRICO REAL DESDE 2022 ---
         cur.execute(f"""
             SELECT anio_escolar, estado, curso
             FROM matricula
@@ -54,24 +59,26 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
 
         for anio_h, estado, curso in filas_historial:
             if anio_h not in historico_dict:
-                historico_dict[anio_h] = {"anio": anio_h, "activos": 0, "retiros": 0, "cursos": {}}
+                # 🌟 NUEVO: Agregamos el diccionario 'cursos_retiros' para el gráfico
+                historico_dict[anio_h] = {"anio": anio_h, "activos": 0, "retiros": 0, "cursos": {}, "cursos_retiros": {}}
+
+            # Limpiamos y agrupamos el nombre del curso (Ej: "1° básico A" -> "1° Básico")
+            curso_str = str(curso).strip() if curso else ""
+            if curso_str:
+                match = re.match(r"^(.*?)\s+[A-Za-z]$", curso_str)
+                nombre_base = match.group(1).strip().capitalize() if match else curso_str.capitalize()
+            else:
+                nombre_base = "Sin Curso"
 
             if estado == 'Activa':
                 historico_dict[anio_h]["activos"] += 1
-                
-                if curso:
-                    # Agrupar curso (Ej: "1° básico A" -> "1° Básico") para el gráfico
-                    curso_str = str(curso).strip()
-                    match = re.match(r"^(.*?)\s+[A-Za-z]$", curso_str)
-                    
-                    if match:
-                        nombre_base = match.group(1).strip().capitalize()
-                    else:
-                        nombre_base = curso_str.capitalize()
-                    
+                if curso_str:
                     historico_dict[anio_h]["cursos"][nombre_base] = historico_dict[anio_h]["cursos"].get(nombre_base, 0) + 1
             else:
                 historico_dict[anio_h]["retiros"] += 1
+                if curso_str:
+                    # 🌟 NUEVO: Sumamos al historial de cursos retirados
+                    historico_dict[anio_h]["cursos_retiros"][nombre_base] = historico_dict[anio_h]["cursos_retiros"].get(nombre_base, 0) + 1
 
         # Ordenar el historial de menor a mayor año para el gráfico
         historico_real = sorted(list(historico_dict.values()), key=lambda x: x["anio"])
@@ -82,7 +89,8 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
             "total_inactivos": total_inactivos,
             "por_nivel": por_nivel,
             "por_curso": por_curso,
-            "historico": historico_real # Enviamos la nueva data a React
+            "por_curso_retiros": por_curso_retiros, # 🌟 NUEVO: Lo enviamos al Frontend
+            "historico": historico_real
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al generar estadísticas: " + str(e))

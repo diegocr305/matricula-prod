@@ -27,11 +27,14 @@ class CrearEstudianteRequest(BaseModel):
     domicilio_apoderado: str
     telefono_apoderado: str
     correo_apoderado: str
+    relacion_estudiante: str
+    ruta_documento_tutor: Optional[str] = None
     # Opcionales (Solo llegarán llenos si React detectó un IPE/IPA)
     pais_origen_estudiante: Optional[str] = "Chile"
     doc_extranjero_estudiante: Optional[str] = None
     pais_origen_apoderado: Optional[str] = "Chile"
     doc_extranjero_apoderado: Optional[str] = None
+
 
 class ActualizarEstudianteRequest(BaseModel):
     domicilio_estudiante: Optional[str] = ""
@@ -66,4 +69,5 @@ def buscar_apoderado(rut_apoderado: str, usuario_actual: dict = Depends(obtener_
 
 @router.put("/{rut}")
 def actualizar_datos_estudiante(rut: str, req: ActualizarEstudianteRequest, usuario_actual: dict = Depends(verificar_escritura)):
-    return estudiante_service.actualizar_datos_estudiante_db(rut, req)
+    id_usuario = usuario_actual.get("id_usuario")
+    return estudiante_service.actualizar_datos_estudiante_db(rut, req, id_usuario)

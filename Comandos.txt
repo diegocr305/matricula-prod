@@ -40,3 +40,9 @@ Password: slep123
 👤 Email: visor.global@slep.cl
 🔑 Password: visor123
 🛡️ Rol: Visualizador_SLEP
+
+✅ Usuario creado/actualizado con éxito.
+🏫 Colegio: LICEO BICENTENARIO MARÍTIMO DE VALPARAÍSO (1520) (ID BD: 17)
+👤 Email: director.bicentenario@colegioslep.cl
+🔑 Password: admin123
+(SIGE: Lbv1520)

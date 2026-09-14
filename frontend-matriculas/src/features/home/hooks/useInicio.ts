@@ -10,7 +10,8 @@ export const useInicio = () => {
     }
   }, []);
 
-  const puedeVerAuditoria = !['Colegio', 'Visualizador_Colegio'].includes(usuario?.rol);
+  // 🌟 CAMBIO AQUÍ: Validación estricta solo para administradores SLEP
+  const puedeVerAuditoria = ['admin_slep', 'SLEP'].includes(usuario?.rol);
 
   return {
     usuario,

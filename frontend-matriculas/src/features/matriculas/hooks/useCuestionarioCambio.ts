@@ -6,24 +6,32 @@ export const useCuestionarioCambio = () => {
   const { id } = useParams<{ id: string }>();
   
   const [rutEstudiante, setRutEstudiante] = useState('');
-  const [motivo, setMotivo] = useState('');
+  const [motivosSeleccionados, setMotivosSeleccionados] = useState<string[]>([]);
+  const [motivoDetalle, setMotivoDetalle] = useState('');
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: 'exito' | 'error' } | null>(null);
+
+  const alternarMotivo = (motivo: string) => {
+    setMotivosSeleccionados((prev) => 
+      prev.includes(motivo) ? prev.filter((m) => m !== motivo) : [...prev, motivo]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
     setMensaje(null);
 
+    const motivosFormateados = motivosSeleccionados.map((m) => `• ${m}`).join('\n');
+    const textoConsolidado = `[Motivos de Traslado]:\n${motivosFormateados}\n\n[Detalles Adicionales]: ${motivoDetalle.trim() || 'Sin comentarios adicionales.'}`;
+
     try {
       const respuesta = await fetch(`${API_URL}/matriculas/${id}/cuestionario-curso`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rut_estudiante: rutEstudiante,
-          motivo_real: motivo
+          motivo_real: textoConsolidado
         })
       });
 
@@ -35,7 +43,8 @@ export const useCuestionarioCambio = () => {
 
       setMensaje({ texto: 'Formulario enviado con Ã©xito. Puede cerrar esta pestaÃ±a.', tipo: 'exito' });
       setRutEstudiante('');
-      setMotivo('');
+      setMotivosSeleccionados([]);
+      setMotivoDetalle('');
     } catch (error: any) {
       setMensaje({ texto: error.message, tipo: 'error' });
     } finally {
@@ -45,7 +54,8 @@ export const useCuestionarioCambio = () => {
 
   return {
     rutEstudiante, setRutEstudiante,
-    motivo, setMotivo,
+    motivosSeleccionados, alternarMotivo,
+    motivoDetalle, setMotivoDetalle,
     cargando,
     mensaje,
     handleSubmit

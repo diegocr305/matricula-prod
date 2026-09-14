@@ -17,7 +17,7 @@ export default function Estudiantes() {
     buscarApoderadoPorRut, buscandoApoderado, avisoApoderado,
     estudianteCreadoExito, rutRecienCreado, cerrarModalExito, irAMatricular,
     nuevoEstudiante, setNuevoEstudiante, formatearRUT, handleCrearEstudiante,
-    creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion
+    creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion,archivoTutor, setArchivoTutor
   } = useEstudiantes();
 
   // 🌟 VARIABLES PARA UI: Detectan en tiempo real si los campos son IPE/IPA
@@ -387,6 +387,63 @@ export default function Estudiantes() {
                   </div>
 
                   <h4 className="font-semibold text-emerald-600 border-b pb-1 mt-6">Datos del Apoderado Titular</h4>
+                  {/* 🌟 NUEVO: SELECTOR DE RELACIÓN CON EL ESTUDIANTE */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">
+                      Relación con el Estudiante (Tipo de Apoderado) <span className="text-red-500">*</span>
+                    </label>
+                    <select 
+                      required 
+                      value={nuevoEstudiante.relacion_estudiante} 
+                      onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, relacion_estudiante: e.target.value})} 
+                      className="w-full border border-emerald-300 rounded-lg p-2 focus:ring-emerald-500 outline-none text-sm bg-white"
+                    >
+                      <option value="">Seleccione el parentesco...</option>
+                      <option value="Madre">Madre</option>
+                      <option value="Padre">Padre</option>
+                      <option value="Abuelo Paterno">Abuelo Paterno</option>
+                      <option value="Abuela Paterna">Abuela Paterna</option>
+                      <option value="Abuelo Materno">Abuelo Materno</option>
+                      <option value="Abuela Materna">Abuela Materna</option>
+                      <option value="Tutor Legal Designado">Tutor Legal Designado (Caso Especial)</option>
+                    </select>
+                  </div>
+
+                  {/* 🌟 CARGA DE DOCUMENTO CONDICIONAL PARA TUTORES */}
+                  {nuevoEstudiante.relacion_estudiante === 'Tutor Legal Designado' && (
+                    <div className="mb-4 bg-orange-50 border border-orange-200 p-4 rounded-lg animate-in slide-in-from-top-2">
+                      <label className="block text-xs font-bold text-orange-800 mb-2">
+                        Adjuntar Documento de Tutoría Legal (PDF) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex items-center justify-center w-full">
+                        <label htmlFor="tutor-upload" className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${archivoTutor ? 'border-emerald-500 bg-emerald-50' : 'border-orange-300 bg-white hover:bg-orange-100'}`}>
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            {archivoTutor ? (
+                              <>
+                                <CheckCircle className="w-6 h-6 mb-2 text-emerald-500" />
+                                <p className="text-sm font-semibold text-emerald-700 truncate max-w-xs">{archivoTutor.name}</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-500"><span className="font-semibold">Haga clic para subir resolución</span> o arrastre el archivo</p>
+                                <p className="text-xs text-gray-400">PDF (MAX. 5MB)</p>
+                              </>
+                            )}
+                          </div>
+                          <input 
+                            id="tutor-upload" 
+                            type="file" 
+                            accept=".pdf,application/pdf" 
+                            className="hidden" 
+                            onChange={(e) => setArchivoTutor(e.target.files?.[0] || null)}
+                          />
+                        </label>
+                      </div>
+                      <p className="text-[11px] text-orange-700 mt-2 font-medium">
+                        * Obligatorio adjuntar el documento emitido por el tribunal u organismo pertinente que corrobore la tutoría legal.
+                      </p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">RUT o Pasaporte <span className="text-red-500">*</span></label>

@@ -14,6 +14,7 @@ class CambioCursoRequest(BaseModel):
     cod_tipo_ensenanza: int
     nuevo_curso: str
     motivo_cambio_curso: Optional[str] = None 
+    correo_destino: Optional[str] = None
 
 @router.get("")
 def obtener_matriculas(establecimiento_id: Optional[int] = None, anio: Optional[str] = None, usuario_actual: dict = Depends(obtener_usuario_actual)):

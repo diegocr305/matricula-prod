@@ -1,6 +1,7 @@
 # services/estudiante_service.py
 from fastapi import HTTPException
 from database import get_db_connection
+import json
 
 def obtener_estudiantes_db(establecimiento_id: int = None, rol: str = None):
     conn = get_db_connection()
@@ -113,12 +114,17 @@ def crear_estudiante_db(payload: dict):
             id_apoderado = apod_db[0]
         else:
             cur.execute("""
-                INSERT INTO apoderado (rut_pasaporte, nombres, apellido_paterno, apellido_materno, domicilio, telefono, correo_electronico, pais_origen, documento_extranjero)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id_apoderado
+                INSERT INTO apoderado (
+                    rut_pasaporte, nombres, apellido_paterno, apellido_materno, 
+                    domicilio, telefono, correo_electronico, pais_origen, 
+                    documento_extranjero, relacion_estudiante, ruta_documento_tutor
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id_apoderado
             """, (run_apod, payload.get("nombres_apoderado"), payload.get("apellido_paterno_apoderado"), 
                   payload.get("apellido_materno_apoderado"), payload.get("domicilio_apoderado"), 
                   payload.get("telefono_apoderado"), payload.get("correo_apoderado"),
-                  payload.get("pais_origen_apoderado", "Chile"), payload.get("doc_extranjero_apoderado", None)))
+                  payload.get("pais_origen_apoderado", "Chile"), payload.get("doc_extranjero_apoderado", None),
+                  payload.get("relacion_estudiante", "No Informado"), payload.get("ruta_documento_tutor", None)))
             id_apoderado = cur.fetchone()[0]
 
         cur.execute("""
@@ -178,7 +184,7 @@ def buscar_apoderado_por_rut_db(rut_apoderado: str):
         conn.close()
 
 
-def actualizar_datos_estudiante_db(rut: str, req):
+def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -258,6 +264,24 @@ def actualizar_datos_estudiante_db(rut: str, req):
                     (nuevo_id, rut),
                 )
                 mensaje = "Apoderado creado y vinculado."
+
+        # --- Trazabilidad: registrar el cambio en la bitacora (aporte del practicante) ---
+        # Buscamos la matricula mas reciente del alumno para vincular el evento.
+        cur.execute("""
+            SELECT id_matricula FROM matricula
+            WHERE id_estudiante = (SELECT id_estudiante FROM estudiante WHERE run_ipe = %s)
+            ORDER BY id_matricula DESC LIMIT 1
+        """, (rut,))
+        mat_result = cur.fetchone()
+
+        if mat_result:
+            id_matricula = mat_result[0]
+            datos_ant = json.dumps({"Ficha_Personal": "Datos Anteriores"})
+            datos_nuev = json.dumps({"Ficha_Personal": "Datos Actualizados"})
+            cur.execute("""
+                INSERT INTO auditoria_matricula (id_matricula, accion, id_usuario, datos_anteriores, datos_nuevos)
+                VALUES (%s, 'UPDATE', %s, %s, %s)
+            """, (id_matricula, id_usuario, datos_ant, datos_nuev))
 
         conn.commit()
         return {"mensaje": mensaje}

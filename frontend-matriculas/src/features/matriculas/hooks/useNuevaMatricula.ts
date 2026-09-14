@@ -10,7 +10,7 @@ export interface MatriculaBase {
   curso: string;
   estudiante_rut: string;
   anio_escolar: number;
-  estado?: string; // ðŸŒŸ AÃ±adimos el estado para contar solo las Activas
+  estado?: string; // estado para contar solo las Activas
 }
 
 export const useNuevaMatricula = () => {
@@ -19,6 +19,11 @@ export const useNuevaMatricula = () => {
   
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+
+  // 🌟 CONTROL DEL WIZARD (PASOS)
+  const [pasoActual, setPasoActual] = useState(1);
+  const irSiguientePaso = () => setPasoActual(prev => prev + 1);
+  const irPasoAnterior = () => setPasoActual(prev => prev - 1);
 
   const [rutBusqueda, setRutBusqueda] = useState('');
   const [estudiante, setEstudiante] = useState<any>(null);
@@ -60,6 +65,8 @@ export const useNuevaMatricula = () => {
   const [establecimientosDb, setEstablecimientosDb] = useState<any[]>([]);
   const [todasLasMatriculas, setTodasLasMatriculas] = useState<MatriculaBase[]>([]);
 
+  const [archivoResolucion, setArchivoResolucion] = useState<File | null>(null);
+  
   const [formulario, setFormulario] = useState({
     id_establecimiento: '',
     numero_correlativo: '',
@@ -70,24 +77,28 @@ export const useNuevaMatricula = () => {
     cursoSeleccionado: '',
     cod_grado: 1,
     letra_curso: 'A',
+    
     es_excedente: false,
-    numero_resolucion_excedente: '',
+    es_alumno_practica: false,
+    res_tipo: '',
+    res_causa: '',
+    res_numero: '',
+    res_anio: new Date().getFullYear().toString(),
+    res_tribunal: '',
     fecha_resolucion_excedente: '',
-    es_alumno_practica: false
+
+    // 🌟 MÉTODO DE ENVÍO/FIRMA (PASO 3)
+    // Religión y autorizaciones ya NO se capturan aquí: las responde el apoderado
+    // en el portal de firma (Digital) o marcándolas a mano en el papel (Manual).
+    metodo_firma: 'Digital'
   });
 
   const [checkCertNotas, setCheckCertNotas] = useState(false);
   const [checkCertRetiro, setCheckCertRetiro] = useState(false);
   const [idEstablecimientoPrevio, setIdEstablecimientoPrevio] = useState<string | null>(null);
 
-// ============================================================================
-  // LÓGICA DINÁMICA DE CONTROL DE CUPOS MÁXIMOS (Conectado a BD/Excel)
-  // ============================================================================
-  
-  // 1. Estado para guardar el límite dinámico (45 por defecto como fallback normativo)
   const [limiteCupos, setLimiteCupos] = useState<number>(45);
 
-  // 2. Función traductora: Convierte "1° Medio A" a "1MEDIO" para que coincida con el Excel
   const formatearNivelExcel = (cursoStr: string) => {
     const texto = cursoStr.toUpperCase();
     const numero = texto.match(/\d+/)?.[0] || "";
@@ -97,10 +108,9 @@ export const useNuevaMatricula = () => {
     if (texto.includes('KINDER') || texto.includes('KÍNDER')) {
       return texto.includes('PRE') ? 'PREKINDER' : 'KINDER';
     }
-    return texto.replace(/[^A-Z0-9]/g, ''); // Fallback de seguridad
+    return texto.replace(/[^A-Z0-9]/g, ''); 
   };
 
-  // 3. Efecto: Consulta al backend la capacidad real cuando cambia el curso o colegio
   useEffect(() => {
     const obtenerCapacidadDinamica = async () => {
       if (!formulario.id_establecimiento || !formulario.cursoSeleccionado) {
@@ -108,7 +118,6 @@ export const useNuevaMatricula = () => {
         return;
       }
 
-      // Buscar el RBD del colegio seleccionado
       const colegio = establecimientosDb.find(e => String(e.id_establecimiento) === String(formulario.id_establecimiento));
       if (!colegio) return;
 
@@ -124,10 +133,9 @@ export const useNuevaMatricula = () => {
           const data = await res.json();
           setLimiteCupos(data.capacidad_maxima);
         } else {
-          setLimiteCupos(45); // Si falla la consulta, mantenemos el límite legal de 45
+          setLimiteCupos(45); 
         }
       } catch (e) {
-        console.error("Error al obtener la capacidad dinámica:", e);
         setLimiteCupos(45);
       }
     };
@@ -135,7 +143,6 @@ export const useNuevaMatricula = () => {
     obtenerCapacidadDinamica();
   }, [formulario.id_establecimiento, formulario.anio_escolar, formulario.cursoSeleccionado, establecimientosDb]);
 
-  // 4. Conteo de ocupación (mantenemos la lógica, pero ahora compararemos con 'limiteCupos')
   const cuposOcupados = useMemo(() => {
     if (!formulario.id_establecimiento || !formulario.cod_tipo_ensenanza || !formulario.cursoSeleccionado) return 0;
     
@@ -148,7 +155,6 @@ export const useNuevaMatricula = () => {
     ).length;
   }, [formulario.id_establecimiento, formulario.anio_escolar, formulario.cod_tipo_ensenanza, formulario.cursoSeleccionado, todasLasMatriculas]);
 
-  // 5. Bloqueo de excedente automático usando el límite dinámico
   useEffect(() => {
     if (cuposOcupados >= limiteCupos) {
       setFormulario(prev => ({ ...prev, es_excedente: true }));
@@ -458,6 +464,7 @@ export const useNuevaMatricula = () => {
   const generarComprobantePDF = async () => {
     try {
       const token = localStorage.getItem('token');
+      // FUTURO: aqui se llamara al endpoint que genera el SOBRE DIGITAL COMPLETO
       const respuesta = await fetch(`${API_URL}/documentos/comprobante/${estudiante.run}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -470,7 +477,7 @@ export const useNuevaMatricula = () => {
       
       const linkDescarga = document.createElement('a');
       linkDescarga.href = url;
-      linkDescarga.download = `Comprobante_Ingreso_${estudiante.run}.pdf`;
+      linkDescarga.download = `Documentos_Matricula_${estudiante.run}.pdf`;
       document.body.appendChild(linkDescarga);
       linkDescarga.click();
       
@@ -478,7 +485,7 @@ export const useNuevaMatricula = () => {
       window.URL.revokeObjectURL(url);
       
     } catch (err: any) {
-      alert("Hubo un error al descargar el comprobante: " + err.message);
+      alert("Hubo un error al descargar los documentos: " + err.message);
       console.error(err);
     }
   };
@@ -490,6 +497,11 @@ export const useNuevaMatricula = () => {
     setCargando(true);
     setError('');
 
+    let stringResolucion = null;
+    if (formulario.es_excedente) {
+      stringResolucion = `[${formulario.res_tipo.toUpperCase()}] Causa: ${formulario.res_causa}, N° ${formulario.res_numero}/${formulario.res_anio} - Tribunal: ${formulario.res_tribunal}`;
+    }
+
     const payload = {
       numero_correlativo: 0,
       anio_escolar: parseInt(formulario.anio_escolar),
@@ -498,7 +510,8 @@ export const useNuevaMatricula = () => {
       fecha_matricula: formulario.fecha_matricula,
       nivel_ensenanza: formulario.nivel_ensenanza,
       curso: formulario.cursoSeleccionado,
-      estado: 'Activa',
+      // 🌟 Con firma Digital, la matrícula queda pendiente hasta que el apoderado firme con Clave Única
+      estado: formulario.metodo_firma === 'Digital' ? 'Pendiente Firma' : 'Activa',
       fecha_retiro: null,
       motivo_retiro: null,
       observaciones: 'MatrÃ­cula ingresada desde portal transaccional.',
@@ -506,10 +519,14 @@ export const useNuevaMatricula = () => {
       cod_tipo_ensenanza: formulario.cod_tipo_ensenanza ? parseInt(formulario.cod_tipo_ensenanza) : null,
       cod_grado: formulario.cod_grado,
       letra_curso: formulario.letra_curso,
+      
       es_excedente: formulario.es_excedente,
-      numero_resolucion_excedente: formulario.numero_resolucion_excedente || null,
+      numero_resolucion_excedente: stringResolucion,
       fecha_resolucion_excedente: formulario.fecha_resolucion_excedente || null,
-      es_alumno_practica: formulario.es_alumno_practica
+      es_alumno_practica: formulario.es_alumno_practica,
+      
+      // 🌟 Religión y autorizaciones las responde el apoderado (portal de firma o papel), no el funcionario
+      metodo_firma: formulario.metodo_firma
     };
 
     const token = localStorage.getItem('token');
@@ -527,6 +544,7 @@ export const useNuevaMatricula = () => {
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.detail || 'Error al guardar la matrÃ­cula.');
       
+      // Si es excedente, faltaría subir el PDF (como lo tenías pensado)
       setMatriculaExitosa(true);
 
     } catch (err: any) {
@@ -586,7 +604,9 @@ export const useNuevaMatricula = () => {
     formFaltantes, setFormFaltantes, colegioProcedencia, esTraslado, guardandoFaltantes,
     establecimientosDb, formulario, checkCertNotas, setCheckCertNotas, checkCertRetiro, setCheckCertRetiro,
     idEstablecimientoPrevio, codigosDisponibles, cursosDisponibles, 
+    archivoResolucion, setArchivoResolucion, 
+    pasoActual, irSiguientePaso, irPasoAnterior, // 🌟 Exportamos variables del Wizard
     seleccionarCurso, handleEscribirBuscador, seleccionarEstudiante, guardarDatosFaltantes, copiarDomicilio, handleChange, generarComprobantePDF, handleSubmit, setCursoPrevio, setCodigoPrevio, setIdEstablecimientoPrevio,
-    esColegioEMTP, esCuartoMedio, cuposOcupados, limiteCupos // 🌟 Añadido al return
+    esColegioEMTP, esCuartoMedio, cuposOcupados, limiteCupos
   };
 };

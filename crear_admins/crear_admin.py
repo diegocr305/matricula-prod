@@ -55,11 +55,11 @@ def crear_usuario_para_colegio(email, nombre, rol, rbd_establecimiento, password
 if __name__ == "__main__":
     # --- REEMPLAZA ESTOS DATOS SEGÚN NECESITES ---
     # Asegúrate de colocar un RBD que sí exista en tu tabla 'establecimiento'
-    RBD_COLEGIO_EXISTENTE = "33428" # <--- Cambia esto por el RBD real de tu base de datos
+    RBD_COLEGIO_EXISTENTE = "1520" # <--- Cambia esto por el RBD real de tu base de datos
     
     crear_usuario_para_colegio(
-        email="director.florida@colegioslep.cl",
-        nombre="Director Juan Perez II",
+        email="director.bicentenario@colegioslep.cl",
+        nombre="CAROLINA ANDREA CONCHA PALOMINO",
         rol="COLEGIO",
         rbd_establecimiento=RBD_COLEGIO_EXISTENTE,
         password_plana="admin123"

@@ -361,7 +361,8 @@ export const useMatriculas = () => {
           fecha_retiro: fechaRetiro,
           motivo_retiro: '', 
           observaciones: '', 
-          id_usuario_ejecutor: 1 
+          id_usuario_ejecutor: 1 ,
+          correo_destino: enviarApoderadoRetiro ? correoApoderadoRetiro.trim() : null
         }),
       });
 
@@ -421,7 +422,8 @@ export const useMatriculas = () => {
         body: JSON.stringify({ 
           cod_tipo_ensenanza: parseInt(planDestino), 
           nuevo_curso: cursoDestino,
-          motivo_cambio_curso: motivoCambio 
+          motivo_cambio_curso: motivoCambio,
+          correo_destino: enviarApoderadoCurso ? correoApoderadoCurso.trim() : null
         }),
       });
 
