@@ -4,21 +4,18 @@
 
 *hacer que funcione el boton de enviar comprobante por correo
 
-* DOMICILIO GEO-REFERENCIADO (estudiante y/o apoderado)
-    Rediseñar el campo de domicilio para poder geo-referenciar al alumno.
-    Separar la direccion en campos estructurados:
-      - Calle / Avenida
-      - Numero
-      - Comuna
-      - Region
-      - Depto / Casa / Block (opcional, o como observacion)
-    Objetivo: obtener lat/long confiables (ya existe integracion con Nominatim/OpenStreetMap
-    en la creacion de estudiante) y poder ubicar al alumno en un mapa.
-    Nota tecnica: hoy la tabla estudiante tiene domicilio (texto), latitud, longitud (varchar).
-    La tabla apoderado tiene domicilio (texto). Decidir si los campos estructurados van en
-    columnas nuevas o en un JSON, y si aplican al estudiante, al apoderado o ambos.
-    PENDIENTE: por eso hoy el campo "domicilio" del apoderado en la ficha quedo deshabilitado
-    de guardado hasta rediseñar este modelo.
+* DOMICILIO GEO-REFERENCIADO (estudiante) -> EN PROGRESO, ver GEOLOCALIZACION.md
+    HECHO: se agregaron columnas estructuradas al estudiante (calle, numero, sector, comuna)
+    + geo_precision. Se cargaron/parsearon las direcciones (Excel RGM 2026 + parser de las
+    antiguas). La ficha del estudiante ya edita por campos. Geocodificacion con Nominatim
+    EN CURSO (solo matricula 2026, ~410 hechos, ~12.266 pendientes). Ver GEOLOCALIZACION.md.
+    PENDIENTE:
+      - terminar el batch de geocodificacion 2026 (reanudable).
+      - decidir fallback para el ~60% que Nominatim no resuelve (nivel comuna/sector, o Google).
+      - geocodificar al crear/editar (bajo demanda) para nuevos ingresos.
+      - mostrar el mapa en el frontend.
+      - APODERADO: el campo "domicilio" del apoderado en la ficha sigue pendiente de
+        rediseño (mismo enfoque estructurado); hoy queda deshabilitado de guardado.
 
 *Revisar como es que deje funcionando el numero de folio y su integracion en la BD
 
