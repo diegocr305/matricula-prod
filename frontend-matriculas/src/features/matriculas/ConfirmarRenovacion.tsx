@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { UserCheck, Home, HeartPulse, Loader2, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { UserCheck, Home, HeartPulse, Loader2, AlertTriangle, ChevronLeft, Copy, Users } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import { ModalExito } from './components/ModalExito';
 
@@ -68,6 +68,8 @@ export default function ConfirmarRenovacion() {
 
   const [domEstudiante, setDomEstudiante] = useState<DomicilioForm>(domicilioVacio);
   const [apoderado, setApoderado] = useState<ApoderadoForm>(apoderadoVacio);
+  const [suplente, setSuplente] = useState<ApoderadoForm>({ ...apoderadoVacio, relacion: 'Padre' });
+  const [tieneSuplente, setTieneSuplente] = useState(false);
   const [salud, setSalud] = useState<SaludForm>(saludVacia);
   const [actualizarSalud, setActualizarSalud] = useState(false);
 
@@ -109,6 +111,20 @@ export default function ConfirmarRenovacion() {
           relacion: a.relacion || 'Madre',
           calle: a.calle || '', numero: a.numero || '', sector: a.sector || '', comuna: a.comuna || '',
         });
+        const sup = data.apoderado_suplente;
+        if (sup && (sup.rut || sup.nombres)) {
+          setTieneSuplente(true);
+          setSuplente({
+            rut: (sup.rut && sup.rut !== 'Sin registrar') ? sup.rut : '',
+            nombres: sup.nombres || '',
+            apellido_paterno: sup.apellido_paterno || '',
+            apellido_materno: sup.apellido_materno || '',
+            telefono: (sup.telefono && sup.telefono !== '-') ? sup.telefono : '',
+            correo: (sup.correo && sup.correo !== '-') ? sup.correo : '',
+            relacion: sup.relacion || 'Padre',
+            calle: sup.calle || '', numero: sup.numero || '', sector: sup.sector || '', comuna: sup.comuna || '',
+          });
+        }
         if (s) {
           setSalud({
             sistema_salud: s.sistema_salud || 'FONASA',
@@ -146,6 +162,12 @@ export default function ConfirmarRenovacion() {
     if (!apoderado.calle.trim() || !apoderado.numero.trim() || !apoderado.comuna.trim()) {
       return 'Complete el domicilio del apoderado: calle, número y comuna son obligatorios.';
     }
+    if (tieneSuplente) {
+      if (!suplente.rut.trim()) return 'Ingrese el RUT del apoderado suplente (o desmarque "Registrar suplente").';
+      if (!suplente.nombres.trim() || !suplente.apellido_paterno.trim()) {
+        return 'Complete nombres y apellido paterno del apoderado suplente.';
+      }
+    }
     return null;
   };
 
@@ -171,6 +193,20 @@ export default function ConfirmarRenovacion() {
         calle_apoderado: apoderado.calle, numero_apoderado: apoderado.numero,
         sector_apoderado: apoderado.sector, comuna_apoderado: apoderado.comuna,
       };
+      if (tieneSuplente) {
+        body.tiene_suplente = true;
+        body.rut_suplente = suplente.rut;
+        body.nombres_suplente = suplente.nombres;
+        body.apellido_paterno_suplente = suplente.apellido_paterno;
+        body.apellido_materno_suplente = suplente.apellido_materno;
+        body.telefono_suplente = suplente.telefono;
+        body.correo_suplente = suplente.correo;
+        body.relacion_suplente = suplente.relacion;
+        body.calle_suplente = suplente.calle;
+        body.numero_suplente = suplente.numero;
+        body.sector_suplente = suplente.sector;
+        body.comuna_suplente = suplente.comuna;
+      }
       if (actualizarSalud) {
         body.actualizar_salud = true;
         Object.assign(body, salud);
@@ -307,7 +343,17 @@ export default function ConfirmarRenovacion() {
 
         {/* Domicilio del apoderado (desglosado, no una línea) */}
         <div className="pt-2">
-          <h3 className="text-sm font-bold text-emerald-800 mb-2">Domicilio del Apoderado <span className="text-red-500">*</span></h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-emerald-800">Domicilio del Apoderado <span className="text-red-500">*</span></h3>
+            <button
+              type="button"
+              onClick={() => setApoderado({ ...apoderado, calle: domEstudiante.calle, numero: domEstudiante.numero, sector: domEstudiante.sector, comuna: domEstudiante.comuna })}
+              className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800"
+              title="Usar el mismo domicilio del estudiante"
+            >
+              <Copy size={14} /> Copiar domicilio del estudiante
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Calle <span className="text-red-500">*</span></label>
@@ -327,6 +373,92 @@ export default function ConfirmarRenovacion() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Apoderado suplente (opcional) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Users className="text-teal-600" size={20} />
+            <h2 className="text-lg font-bold text-gray-800">Apoderado Suplente <span className="text-gray-400 text-sm font-normal">(opcional)</span></h2>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={tieneSuplente} onChange={(e) => setTieneSuplente(e.target.checked)} className="w-4 h-4" />
+            Registrar suplente
+          </label>
+        </div>
+        <p className="text-xs text-gray-500">
+          Puede firmar la matrícula el apoderado titular <strong>o</strong> el suplente. Si el
+          suplente será quien firme en SIMPLE, regístrelo aquí para que su Clave Única sea aceptada.
+        </p>
+        {tieneSuplente && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>RUT <span className="text-red-500">*</span></label>
+                <input className={inputCls} value={suplente.rut} onChange={(e) => setSuplente({ ...suplente, rut: e.target.value })} placeholder="12.345.678-9 o 123456789" />
+              </div>
+              <div>
+                <label className={labelCls}>Parentesco</label>
+                <select className={inputCls} value={suplente.relacion} onChange={(e) => setSuplente({ ...suplente, relacion: e.target.value })}>
+                  <option>Madre</option><option>Padre</option><option>Abuelo/a</option>
+                  <option>Tutor Legal</option><option>Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Nombres <span className="text-red-500">*</span></label>
+                <input className={inputCls} value={suplente.nombres} onChange={(e) => setSuplente({ ...suplente, nombres: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelCls}>Apellido Paterno <span className="text-red-500">*</span></label>
+                <input className={inputCls} value={suplente.apellido_paterno} onChange={(e) => setSuplente({ ...suplente, apellido_paterno: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelCls}>Apellido Materno</label>
+                <input className={inputCls} value={suplente.apellido_materno} onChange={(e) => setSuplente({ ...suplente, apellido_materno: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelCls}>Teléfono</label>
+                <input className={inputCls} value={suplente.telefono} onChange={(e) => setSuplente({ ...suplente, telefono: e.target.value })} placeholder="+56 9 ..." />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>Correo Electrónico</label>
+                <input className={inputCls} type="email" value={suplente.correo} onChange={(e) => setSuplente({ ...suplente, correo: e.target.value })} placeholder="correo@ejemplo.com" />
+              </div>
+            </div>
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-teal-800">Domicilio del Suplente</h3>
+                <button
+                  type="button"
+                  onClick={() => setSuplente({ ...suplente, calle: domEstudiante.calle, numero: domEstudiante.numero, sector: domEstudiante.sector, comuna: domEstudiante.comuna })}
+                  className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800"
+                  title="Usar el mismo domicilio del estudiante"
+                >
+                  <Copy size={14} /> Copiar domicilio del estudiante
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Calle</label>
+                  <input className={inputCls} value={suplente.calle} onChange={(e) => setSuplente({ ...suplente, calle: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelCls}>Número</label>
+                  <input className={inputCls} value={suplente.numero} onChange={(e) => setSuplente({ ...suplente, numero: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelCls}>Sector / Cerro</label>
+                  <input className={inputCls} value={suplente.sector} onChange={(e) => setSuplente({ ...suplente, sector: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelCls}>Comuna</label>
+                  <input className={inputCls} value={suplente.comuna} onChange={(e) => setSuplente({ ...suplente, comuna: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Ficha médica (opcional) */}
