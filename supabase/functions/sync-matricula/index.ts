@@ -214,6 +214,9 @@ Deno.serve(async (req) => {
       .from("matricula")
       .update({
         estado_firma: "Firmada",
+        // Sincroniza tambien la columna del flujo de renovacion (piloto 2027),
+        // que es la que ve el funcionario en el badge de la grilla.
+        estado_renovacion: "Firmada",
         metodo_firma: "clave_unica_simple",
         opcion_religion: payload["religion"] ?? null,
         acepta_compromiso: siNo(payload["acepta_acta"]),
