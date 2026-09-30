@@ -725,7 +725,7 @@ def generar_pdf_certificado_db(id_matricula: int, tipo: str, usuario_actual: dic
                    e.run_ipe, e.nombres, e.apellido_paterno, e.apellido_materno, e.sexo,
                    m.estado, m.fecha_retiro, m.motivo_cambio_curso, est.nombre, est.rbd,
                    a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno, e.domicilio,
-                   m.id_establecimiento
+                   m.id_establecimiento, m.estado_renovacion
             FROM matricula m 
             INNER JOIN estudiante e ON m.id_estudiante = e.id_estudiante 
             INNER JOIN establecimiento est ON m.id_establecimiento = est.id_establecimiento
@@ -740,6 +740,15 @@ def generar_pdf_certificado_db(id_matricula: int, tipo: str, usuario_actual: dic
             id_est_user = usuario_actual.get("id_establecimiento")
             if id_est_user and datos[20] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para descargar certificados de otro establecimiento.")
+
+        # Candado: no se puede emitir el documento de una matrícula en renovación
+        # que aún no ha sido firmada por el apoderado en SIMPLE.
+        estado_renov = datos[21]
+        if estado_renov in ("Por renovar", "Pendiente firma"):
+            raise HTTPException(
+                status_code=409,
+                detail="No se puede emitir el documento: la matrícula aún no ha sido firmada por el apoderado.",
+            )
         
         rut_apod = datos[15] if datos[15] else "Sin registro"
         nom_apod = f"{datos[16] or ''} {datos[17] or ''} {datos[18] or ''}".strip()

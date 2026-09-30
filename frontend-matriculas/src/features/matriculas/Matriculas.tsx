@@ -288,9 +288,16 @@ export default function Matriculas() {
                         )}
                         {mat.estado === 'Activa' && (
                           <>
-                            <button onClick={() => abrirModalEmision(mat.id_matricula, 'MATRICULA')} className="text-emerald-600 hover:text-emerald-800 font-medium transition-colors">
-                              Emitir Doc.
-                            </button>
+                            {/* "Emitir Doc." solo si la matrícula NO está en un flujo de
+                                renovación pendiente. Se oculta mientras esté 'Por renovar'
+                                o 'Pendiente firma' (aún no firmada por el apoderado).
+                                En matrículas históricas (estado_renovacion null) o ya
+                                'Firmada' se muestra normalmente. */}
+                            {mat.estado_renovacion !== 'Por renovar' && mat.estado_renovacion !== 'Pendiente firma' && (
+                              <button onClick={() => abrirModalEmision(mat.id_matricula, 'MATRICULA')} className="text-emerald-600 hover:text-emerald-800 font-medium transition-colors">
+                                Emitir Doc.
+                              </button>
+                            )}
 
                             {puedeEditar && mat.estado_renovacion === 'Por renovar' && (
                               <Link
