@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from database import get_db_connection
 import json
 from services import storage_service
+from services.utils import normalizar_rut
 
 def componer_domicilio(calle, numero, sector, comuna):
     """Compone una dirección en un solo texto a partir de sus componentes."""
@@ -362,7 +363,7 @@ def crear_estudiante_db(payload: dict):
     cur = conn.cursor()
     try:
         # 1. Procesar Apoderado Principal
-        run_apod = payload.get("run_apoderado")
+        run_apod = normalizar_rut(payload.get("run_apoderado"))
         cur.execute("SELECT id_apoderado FROM apoderado WHERE rut_pasaporte = %s", (run_apod,))
         apod_db = cur.fetchone()
         
@@ -403,7 +404,7 @@ def crear_estudiante_db(payload: dict):
         # 2. Procesar Apoderado Suplente (si aplica)
         id_suplente = None
         if payload.get("tiene_suplente") and payload.get("run_suplente"):
-            run_sup = payload.get("run_suplente")
+            run_sup = normalizar_rut(payload.get("run_suplente"))
             cur.execute("SELECT id_apoderado FROM apoderado WHERE rut_pasaporte = %s", (run_sup,))
             sup_db = cur.fetchone()
             if sup_db:
@@ -507,7 +508,7 @@ def buscar_apoderado_por_rut_db(rut_apoderado: str):
             GROUP BY a.id_apoderado, a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno,
                      a.domicilio, a.telefono, a.correo_electronico
             """,
-            (rut_apoderado.strip(),),
+            (normalizar_rut(rut_apoderado),),
         )
         fila = cur.fetchone()
         if not fila:
@@ -616,7 +617,7 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
 
         # 3. Procesar Apoderado Principal
         if req.rut_apoderado:
-            rut_nuevo = (req.rut_apoderado or "").strip()
+            rut_nuevo = normalizar_rut(req.rut_apoderado)
             nom_a = req.nombres_apoderado or "Apoderado"
             pat_a = req.apellido_paterno_apoderado or "Titular"
             mat_a = req.apellido_materno_apoderado or ""
@@ -668,6 +669,7 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
         # 4. Procesar Apoderado Suplente
         modificar_supl = getattr(req, "modificar_suplente", False)
         if getattr(req, "tiene_suplente", False) and getattr(req, "rut_suplente", None):
+            rut_supl_norm = normalizar_rut(req.rut_suplente)
             nom_s = req.nombres_suplente or "Apoderado"
             pat_s = req.apellido_paterno_suplente or "Suplente"
             mat_s = req.apellido_materno_suplente or ""
@@ -690,9 +692,9 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
                     SET rut_pasaporte = %s, nombres = %s, apellido_paterno = %s, apellido_materno = %s, 
                         domicilio = %s, telefono = %s, correo_electronico = %s, relacion_estudiante = %s
                     WHERE id_apoderado = %s
-                """, (req.rut_suplente, nom_s, pat_s, mat_s, dom_s, tel_s, cor_s, rel_s, id_apod_supl))
+                """, (rut_supl_norm, nom_s, pat_s, mat_s, dom_s, tel_s, cor_s, rel_s, id_apod_supl))
             else:
-                cur.execute("SELECT id_apoderado, relacion_estudiante FROM apoderado WHERE rut_pasaporte = %s", (req.rut_suplente,))
+                cur.execute("SELECT id_apoderado, relacion_estudiante FROM apoderado WHERE rut_pasaporte = %s", (rut_supl_norm,))
                 sup_exist = cur.fetchone()
                 if sup_exist:
                     id_apod_supl = sup_exist[0]
@@ -708,7 +710,7 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
                     cur.execute("""
                         INSERT INTO apoderado (rut_pasaporte, nombres, apellido_paterno, apellido_materno, domicilio, telefono, correo_electronico, relacion_estudiante)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id_apoderado
-                    """, (req.rut_suplente, nom_s, pat_s, mat_s, dom_s, tel_s, cor_s, rel_s))
+                    """, (rut_supl_norm, nom_s, pat_s, mat_s, dom_s, tel_s, cor_s, rel_s))
                     id_apod_supl = cur.fetchone()[0]
 
                 cur.execute("UPDATE estudiante SET id_apoderado_suplente = %s WHERE id_estudiante = %s", (id_apod_supl, id_estudiante))
@@ -762,4 +764,4 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cur.close()
-        conn.close()
+        conn.close()
