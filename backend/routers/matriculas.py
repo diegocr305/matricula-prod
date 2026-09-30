@@ -75,6 +75,13 @@ def actualizar_matricula(
 ):
     return matricula_service.actualizar_estado_matricula_db(id_matricula, matricula, usuario_actual, background_tasks=background_tasks)
 
+@router.put("/{id_matricula}/confirmar-renovacion")
+def confirmar_renovacion(id_matricula: int, usuario_actual: dict = Depends(verificar_escritura)):
+    """Confirma la renovación de una matrícula pre-creada (estado_renovacion
+    'Por renovar' -> 'Pendiente firma'). Los datos de estudiante/apoderado/ficha
+    deben guardarse antes con PUT /estudiante/{rut}. No crea matrícula nueva."""
+    return matricula_service.confirmar_renovacion_db(id_matricula, usuario_actual)
+
 @router.put("/{id_matricula}/cuestionario")
 def responder_cuestionario(id_matricula: int, payload: CuestionarioRetiro):
     return matricula_service.guardar_respuesta_cuestionario_db(id_matricula, payload)

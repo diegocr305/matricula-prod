@@ -6,6 +6,7 @@ import Estadisticas from '../features/dashboard/Inicio';
 import Estudiantes from '../features/estudiantes/Estudiantes';
 import Matriculas from '../features/matriculas/Matriculas';
 import NuevaMatricula from '../features/matriculas/NuevaMatricula';
+import ConfirmarRenovacion from '../features/matriculas/ConfirmarRenovacion';
 import CuestionarioRetiro from '../features/matriculas/CuestionarioRetiro';
 import Verificador from '../features/documentos/Verificador';
 import Auditoria from '../features/auditoria/Auditoria';
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/verificar" element={<Verificador />} />
           <Route path="matriculas" element={<Matriculas />} />
           <Route path="matriculas/nueva" element={<NuevaMatricula />} />
+          <Route path="matriculas/confirmar-renovacion/:idMatricula" element={<ConfirmarRenovacion />} />
           <Route path="estudiantes" element={<Estudiantes />} />
           <Route path="auditoria" element={<Auditoria />} />
           

@@ -74,6 +74,13 @@ class ActualizarEstudianteRequest(BaseModel):
     apellido_paterno_apoderado: Optional[str] = None
     apellido_materno_apoderado: Optional[str] = None
     domicilio_apoderado: Optional[str] = None
+    # Domicilio del apoderado desglosado (georreferenciable). Si vienen, se
+    # componen a 'domicilio_apoderado'. Retrocompatible: si no vienen, se usa
+    # domicilio_apoderado tal cual.
+    calle_apoderado: Optional[str] = None
+    numero_apoderado: Optional[str] = None
+    sector_apoderado: Optional[str] = None
+    comuna_apoderado: Optional[str] = None
     telefono_apoderado: Optional[str] = None
     correo_apoderado: Optional[str] = None
     relacion_apoderado: Optional[str] = None
@@ -86,6 +93,10 @@ class ActualizarEstudianteRequest(BaseModel):
     apellido_paterno_suplente: Optional[str] = None
     apellido_materno_suplente: Optional[str] = None
     domicilio_suplente: Optional[str] = None
+    calle_suplente: Optional[str] = None
+    numero_suplente: Optional[str] = None
+    sector_suplente: Optional[str] = None
+    comuna_suplente: Optional[str] = None
     telefono_suplente: Optional[str] = None
     correo_suplente: Optional[str] = None
     relacion_suplente: Optional[str] = None

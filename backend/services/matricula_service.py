@@ -133,7 +133,7 @@ def obtener_todas_matriculas_db(
                    e.run_ipe, e.nombres, e.apellido_paterno, a.rut_pasaporte, a.nombres, a.apellido_paterno,
                    m.anio_escolar, cte.descripcion, est.rbd, m.cod_tipo_ensenanza, m.id_establecimiento,
                    m.es_excedente, m.numero_resolucion_excedente, m.fecha_resolucion_excedente, m.ruta_documento_resolucion,
-                   m.motivo_cambio_curso
+                   m.motivo_cambio_curso, m.estado_renovacion
             {base_where}
             ORDER BY m.id_matricula DESC
             LIMIT %s OFFSET %s
@@ -150,7 +150,8 @@ def obtener_todas_matriculas_db(
             "numero_resolucion_excedente": f[18],
             "fecha_resolucion_excedente": str(f[19]) if f[19] else None,
             "ruta_documento_resolucion": f[20],
-            "motivo_cambio_curso": f[21]
+            "motivo_cambio_curso": f[21],
+            "estado_renovacion": f[22]
         } for f in cur.fetchall()]
 
         import math
@@ -164,6 +165,82 @@ def obtener_todas_matriculas_db(
     finally:
         cur.close()
         conn.close()
+
+def confirmar_renovacion_db(id_matricula: int, usuario_actual: dict):
+    """Confirma la renovacion de una matricula PRE-CREADA (Opcion A): pasa
+    estado_renovacion de 'Por renovar' a 'Pendiente firma'. No crea matricula
+    nueva. Los datos de estudiante/apoderado/ficha se guardan aparte con
+    PUT /estudiante/{rut} antes de llamar aqui.
+
+    Reglas:
+    - La matricula debe existir (404 si no).
+    - El colegio solo puede confirmar matriculas de su establecimiento (403).
+    - Solo se confirma si estado_renovacion = 'Por renovar' (409 en otro caso,
+      salvo que ya este 'Pendiente firma' -> idempotente, devuelve ok).
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT m.id_establecimiento, m.estado_renovacion, m.anio_escolar,
+                   e.run_ipe, e.id_apoderado_principal, e.id_apoderado_suplente
+            FROM matricula m
+            JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+            WHERE m.id_matricula = %s
+        """, (id_matricula,))
+        fila = cur.fetchone()
+        if not fila:
+            raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
+
+        id_est, estado_renov, anio, run_ipe, id_apod_ppal, id_apod_supl = fila
+
+        # Permisos: un colegio solo confirma matriculas de su establecimiento.
+        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+            id_est_user = usuario_actual.get("id_establecimiento")
+            if id_est_user and id_est != id_est_user:
+                raise HTTPException(status_code=403, detail="No tiene permisos para confirmar esta matrícula.")
+
+        # Idempotencia: si ya esta en 'Pendiente firma' o 'Firmada', no re-procesa.
+        if estado_renov in ("Pendiente firma", "Firmada"):
+            return {
+                "ok": True, "id_matricula": id_matricula,
+                "estado_renovacion": estado_renov, "rut_alumno": run_ipe,
+                "anio_escolar": anio, "mensaje": "La renovación ya estaba registrada."
+            }
+
+        if estado_renov != "Por renovar":
+            raise HTTPException(
+                status_code=409,
+                detail=f"La matrícula no está en estado 'Por renovar' (estado actual: {estado_renov or 'sin estado'})."
+            )
+
+        # Requisito para poder firmar en SIMPLE: debe existir apoderado cargado.
+        if not id_apod_ppal and not id_apod_supl:
+            raise HTTPException(
+                status_code=422,
+                detail="El estudiante no tiene apoderado registrado. Actualice la ficha del apoderado antes de enviar a firma."
+            )
+
+        cur.execute(
+            "UPDATE matricula SET estado_renovacion = 'Pendiente firma' WHERE id_matricula = %s",
+            (id_matricula,),
+        )
+        conn.commit()
+        return {
+            "ok": True, "id_matricula": id_matricula,
+            "estado_renovacion": "Pendiente firma", "rut_alumno": run_ipe,
+            "anio_escolar": anio, "mensaje": "Renovación confirmada. Envíe a firma al apoderado."
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al confirmar renovación: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
 
 def guardar_documento_resolucion_db(id_matricula: int, archivo_bytes: bytes, filename: str, usuario_actual: dict):
     conn = get_db_connection()

@@ -217,15 +217,36 @@ export default function Matriculas() {
                     </td>
                     <td className="p-4 text-center font-semibold text-gray-700">{mat.anio_escolar}</td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                        mat.estado === 'Activa' 
-                          ? 'bg-green-50 text-green-700 border-green-200' 
-                          : mat.estado === 'Pendiente Retiro'
-                          ? 'bg-amber-50 text-amber-800 border-amber-300'
-                          : 'bg-red-50 text-red-700 border-red-200'
-                      }`}>
-                        {mat.estado === 'Pendiente Retiro' ? '⏳ Pendiente Retiro' : mat.estado}
-                      </span>
+                      <div className="flex flex-col gap-1.5 items-start">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                          mat.estado === 'Activa' 
+                            ? 'bg-green-50 text-green-700 border-green-200' 
+                            : mat.estado === 'Pendiente Retiro'
+                            ? 'bg-amber-50 text-amber-800 border-amber-300'
+                            : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                          {mat.estado === 'Pendiente Retiro' ? '⏳ Pendiente Retiro' : mat.estado}
+                        </span>
+                        {mat.estado_renovacion && (
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                            mat.estado_renovacion === 'Firmada'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : mat.estado_renovacion === 'Pendiente firma'
+                              ? 'bg-amber-50 text-amber-800 border-amber-300'
+                              : mat.estado_renovacion === 'Por renovar'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : mat.estado_renovacion === 'No renueva'
+                              ? 'bg-gray-100 text-gray-600 border-gray-300'
+                              : 'bg-slate-100 text-slate-600 border-slate-300'
+                          }`} title={`Renovación: ${mat.estado_renovacion}`}>
+                            {mat.estado_renovacion === 'Firmada' ? '✅ Firmada'
+                              : mat.estado_renovacion === 'Pendiente firma' ? '✍️ Pendiente firma'
+                              : mat.estado_renovacion === 'Por renovar' ? '🔄 Por renovar'
+                              : mat.estado_renovacion === 'Egresado' ? '🎓 Egresado'
+                              : mat.estado_renovacion}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     
                     <td className="p-4 text-right">
@@ -270,6 +291,17 @@ export default function Matriculas() {
                             <button onClick={() => abrirModalEmision(mat.id_matricula, 'MATRICULA')} className="text-emerald-600 hover:text-emerald-800 font-medium transition-colors">
                               Emitir Doc.
                             </button>
+
+                            {puedeEditar && mat.estado_renovacion === 'Por renovar' && (
+                              <Link
+                                to={`/matriculas/confirmar-renovacion/${mat.id_matricula}`}
+                                state={{ rut: mat.estudiante_rut, curso: mat.curso, anio: mat.anio_escolar }}
+                                className="text-indigo-600 hover:text-indigo-800 font-bold transition-colors"
+                                title="Actualizar datos del apoderado y estudiante y enviar a firma"
+                              >
+                                Confirmar Renovación
+                              </Link>
+                            )}
                             
                             {puedeEditar && mat.anio_escolar === anioActual && !mat.motivo_cambio_curso?.startsWith('PENDIENTE_TRASLADO') && (
                               <button onClick={() => iniciarCambioCurso(mat.id_matricula, mat.curso, mat.cod_tipo_ensenanza)} className="text-blue-600 hover:text-blue-800 font-medium transition-colors">Mover</button>

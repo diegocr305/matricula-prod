@@ -23,6 +23,7 @@ export interface Matricula {
   fecha_resolucion_excedente?: string | null;
   ruta_documento_resolucion?: string | null;
   motivo_cambio_curso?: string | null;
+  estado_renovacion?: string | null;
 }
 
 export interface PaginatedResponse {
