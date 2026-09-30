@@ -169,7 +169,7 @@ export default function Matriculas() {
                 <th className="p-4 font-medium">Folio</th>
                 <th className="p-4 font-medium text-center">RBD</th>
                 <th className="p-4 font-medium">Estudiante</th>
-                <th className="p-4 font-medium">Apoderado Titular</th>
+                <th className="p-4 font-medium">Apoderado(s)</th>
                 <th className="p-4 font-medium">Curso y Plan</th>
                 <th className="p-4 font-medium text-center">Año</th>
                 <th className="p-4 font-medium cursor-pointer hover:bg-gray-200 transition-colors group select-none" onClick={() => setOrdenEstado(prev => prev === 'asc' ? 'desc' : 'asc')}>
@@ -200,6 +200,12 @@ export default function Matriculas() {
                     <td className="p-4">
                         <p className="font-medium text-emerald-700">{formatearNombreCorto(mat.apoderado_nombre)}</p>
                         <p className="text-xs text-gray-500">{mat.apoderado_rut}</p>
+                        {mat.suplente_nombre && (
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            <span className="font-semibold">Supl:</span> {formatearNombreCorto(mat.suplente_nombre)}
+                            {mat.suplente_rut ? ` · ${mat.suplente_rut}` : ''}
+                          </p>
+                        )}
                     </td>
                     <td className="p-4">
                         <div className="flex items-center gap-1.5">

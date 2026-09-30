@@ -24,6 +24,8 @@ export interface Matricula {
   ruta_documento_resolucion?: string | null;
   motivo_cambio_curso?: string | null;
   estado_renovacion?: string | null;
+  suplente_rut?: string | null;
+  suplente_nombre?: string | null;
 }
 
 export interface PaginatedResponse {

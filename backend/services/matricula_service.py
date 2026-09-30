@@ -88,6 +88,7 @@ def obtener_todas_matriculas_db(
             FROM matricula m
             INNER JOIN estudiante e ON m.id_estudiante = e.id_estudiante
             LEFT JOIN apoderado a ON e.id_apoderado_principal = a.id_apoderado
+            LEFT JOIN apoderado asup ON e.id_apoderado_suplente = asup.id_apoderado
             LEFT JOIN catalogo_tipo_ensenanza cte ON m.cod_tipo_ensenanza = cte.codigo
             INNER JOIN establecimiento est ON m.id_establecimiento = est.id_establecimiento
             WHERE 1=1
@@ -133,7 +134,8 @@ def obtener_todas_matriculas_db(
                    e.run_ipe, e.nombres, e.apellido_paterno, a.rut_pasaporte, a.nombres, a.apellido_paterno,
                    m.anio_escolar, cte.descripcion, est.rbd, m.cod_tipo_ensenanza, m.id_establecimiento,
                    m.es_excedente, m.numero_resolucion_excedente, m.fecha_resolucion_excedente, m.ruta_documento_resolucion,
-                   m.motivo_cambio_curso, m.estado_renovacion
+                   m.motivo_cambio_curso, m.estado_renovacion,
+                   asup.rut_pasaporte, asup.nombres, asup.apellido_paterno
             {base_where}
             ORDER BY m.id_matricula DESC
             LIMIT %s OFFSET %s
@@ -151,7 +153,9 @@ def obtener_todas_matriculas_db(
             "fecha_resolucion_excedente": str(f[19]) if f[19] else None,
             "ruta_documento_resolucion": f[20],
             "motivo_cambio_curso": f[21],
-            "estado_renovacion": f[22]
+            "estado_renovacion": f[22],
+            "suplente_rut": f[23] or None,
+            "suplente_nombre": formatear_nombre_apoderado_resumido(f[24], f[25]) if f[23] else None
         } for f in cur.fetchall()]
 
         import math
