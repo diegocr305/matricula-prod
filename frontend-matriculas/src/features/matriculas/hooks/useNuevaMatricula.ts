@@ -990,18 +990,37 @@ export const useNuevaMatricula = () => {
     const numPrevioMatch = cursoPrevio.match(/\d+/);
     const numDestinoMatch = formulario.cursoSeleccionado.match(/\d+/);
 
+    // Calcula un "grado absoluto" continuo para toda la trayectoria escolar chilena,
+    // de modo que 8° básico (8) -> 1° medio (9) sea una promocion de +1 y no un
+    // falso retroceso/repitencia. En Media el numero se reinicia (1°..4°), por eso
+    // NO basta comparar el numero suelto: hay que sumar el offset de basica.
+    // Es media si el texto dice "medio/media" o el cod_tipo de ensenanza es >= 300.
+    const OFFSET_MEDIA = 8; // 8 grados de basica antes de 1° medio
+    const esMedia = (curso: string, codTipo: number | string | null | undefined) => {
+      const t = (curso || '').toLowerCase();
+      if (t.includes('medio') || t.includes('media')) return true;
+      const cod = Number(codTipo);
+      return Number.isFinite(cod) && cod >= 300;
+    };
+    const gradoAbsoluto = (numMatch: RegExpMatchArray, curso: string, codTipo: number | string | null | undefined) => {
+      const n = parseInt(numMatch[0]);
+      return esMedia(curso, codTipo) ? OFFSET_MEDIA + n : n;
+    };
+
     if (numPrevioMatch && numDestinoMatch) {
       const numPrevio = parseInt(numPrevioMatch[0]);
       const numDestino = parseInt(numDestinoMatch[0]);
+      const gradoPrevio = gradoAbsoluto(numPrevioMatch, cursoPrevio, codigoPrevio);
+      const gradoDestino = gradoAbsoluto(numDestinoMatch, formulario.cursoSeleccionado, formulario.cod_tipo_ensenanza);
 
-      if (numDestino === numPrevio + 1) {
-        alertas.push({texto: `Promoción: El estudiante avanza al curso siguiente (de ${numPrevio} a ${numDestino}).`, tipo: 'info'});
-      } else if (numDestino === numPrevio) {
+      if (gradoDestino === gradoPrevio + 1) {
+        alertas.push({texto: `Promoción: El estudiante avanza al curso siguiente (de ${cursoPrevio} a ${formulario.cursoSeleccionado}).`, tipo: 'info'});
+      } else if (gradoDestino === gradoPrevio) {
         alertas.push({texto: `Repitencia: El estudiante mantiene el mismo nivel cursado (${numPrevio}).`, tipo: 'alerta'});
-      } else if (numDestino < numPrevio) {
-        alertas.push({texto: `Retroceso abrupto: Está matriculando al estudiante en un grado INFERIOR al que ya cursó (de ${numPrevio} a ${numDestino}).`, tipo: 'peligro'});
-      } else if (numDestino > numPrevio + 1) {
-        alertas.push({texto: `Salto abrupto: Está adelantando al estudiante múltiples grados (de ${numPrevio} a ${numDestino}).`, tipo: 'peligro'});
+      } else if (gradoDestino < gradoPrevio) {
+        alertas.push({texto: `Retroceso abrupto: Está matriculando al estudiante en un grado INFERIOR al que ya cursó (de ${cursoPrevio} a ${formulario.cursoSeleccionado}).`, tipo: 'peligro'});
+      } else if (gradoDestino > gradoPrevio + 1) {
+        alertas.push({texto: `Salto abrupto: Está adelantando al estudiante múltiples grados (de ${cursoPrevio} a ${formulario.cursoSeleccionado}).`, tipo: 'peligro'});
       }
     } else {
       const basePrevio = cursoPrevio.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
