@@ -256,3 +256,140 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
     finally:
         cur.close()
         conn.close()
+
+
+def obtener_calidad_dato_por_establecimiento_db(establecimiento_id: int = None, anio: int = None):
+    """Semaforo de calidad del dato: por establecimiento, % de alumnos activos con
+    direccion geolocalizable (domicilio con numero) y % con apoderado principal cargado.
+    - SLEP (establecimiento_id None): devuelve todos los colegios (ranking).
+    - Colegio: solo el suyo.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Si no se pasa anio, usar el mas reciente disponible.
+        if anio is None:
+            cur.execute("SELECT MAX(anio_escolar) FROM matricula")
+            row = cur.fetchone()
+            anio = row[0] if row and row[0] else None
+
+        filtros = "m.anio_escolar = %s AND m.estado = 'Activa'"
+        params = [anio]
+        if establecimiento_id is not None:
+            filtros += " AND m.id_establecimiento = %s"
+            params.append(establecimiento_id)
+
+        cur.execute(f"""
+            SELECT est.id_establecimiento, est.rbd, est.nombre,
+                   COUNT(*) AS total,
+                   COUNT(*) FILTER (
+                       WHERE e.domicilio IS NOT NULL
+                         AND length(trim(e.domicilio)) > 8
+                         AND e.domicilio ~ '[0-9]'
+                   ) AS con_direccion,
+                   COUNT(*) FILTER (WHERE e.id_apoderado_principal IS NOT NULL) AS con_apoderado
+            FROM matricula m
+            JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+            JOIN establecimiento est ON est.id_establecimiento = m.id_establecimiento
+            WHERE {filtros}
+            GROUP BY est.id_establecimiento, est.rbd, est.nombre
+            HAVING COUNT(*) >= 20
+            ORDER BY
+                (COUNT(*) FILTER (WHERE e.domicilio IS NOT NULL AND length(trim(e.domicilio)) > 8 AND e.domicilio ~ '[0-9]'))::float
+                / COUNT(*) DESC
+        """, tuple(params))
+
+        items = []
+        for r in cur.fetchall():
+            idp, rbd, nombre, total, con_dir, con_apod = r
+            items.append({
+                "id_establecimiento": idp,
+                "rbd": rbd,
+                "nombre": nombre,
+                "total": total,
+                "con_direccion": con_dir,
+                "con_apoderado": con_apod,
+                "pct_direccion": round(con_dir / total * 100, 1) if total else 0.0,
+                "pct_apoderado": round(con_apod / total * 100, 1) if total else 0.0,
+            })
+
+        return {"anio": anio, "establecimientos": items}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error al calcular calidad del dato: " + str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+def obtener_muestra_geo_db(establecimiento_id: int = None, limite: int = 15):
+    """Muestra de direcciones reales (anonimizadas) de un colegio para el mapa de ejemplo.
+    No expone el nombre completo del menor: devuelve iniciales + curso + direccion.
+    Si no se pasa establecimiento, elige el de mayor % de direccion geolocalizable.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT MAX(anio_escolar) FROM matricula")
+        row = cur.fetchone()
+        anio = row[0] if row and row[0] else None
+
+        # Elegir colegio con mayor tasa de direccion util si no viene dado.
+        if establecimiento_id is None:
+            cur.execute("""
+                SELECT m.id_establecimiento
+                FROM matricula m JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+                WHERE m.anio_escolar = %s AND m.estado = 'Activa'
+                GROUP BY m.id_establecimiento
+                HAVING COUNT(*) >= 50
+                ORDER BY (COUNT(*) FILTER (WHERE e.domicilio ~ '[0-9]'))::float / COUNT(*) DESC
+                LIMIT 1
+            """, (anio,))
+            row = cur.fetchone()
+            establecimiento_id = row[0] if row else None
+
+        cur.execute("""
+            SELECT est.nombre, est.rbd,
+                   e.nombres, e.apellido_paterno, m.curso,
+                   e.calle, e.numero, e.sector, e.comuna, e.domicilio
+            FROM matricula m
+            JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+            JOIN establecimiento est ON est.id_establecimiento = m.id_establecimiento
+            WHERE m.anio_escolar = %s AND m.estado = 'Activa'
+              AND m.id_establecimiento = %s
+              AND e.domicilio IS NOT NULL AND e.domicilio ~ '[0-9]'
+              AND (e.comuna IS NOT NULL AND trim(e.comuna) <> '')
+            ORDER BY random()
+            LIMIT %s
+        """, (anio, establecimiento_id, limite))
+
+        filas = cur.fetchall()
+        nombre_colegio = filas[0][0] if filas else ""
+        rbd = filas[0][1] if filas else ""
+        muestra = []
+        for r in filas:
+            nombres, ap_pat, curso, calle, numero, sector, comuna, domicilio = r[2:]
+            iniciales = f"{(nombres or '?')[:1]}.{(ap_pat or '?')[:1]}."
+            # Direccion para geocodificar: preferir campo compuesto 'domicilio' + comuna + Chile.
+            dir_geo = (domicilio or "").strip()
+            if comuna and comuna.lower() not in dir_geo.lower():
+                dir_geo = f"{dir_geo}, {comuna}"
+            dir_geo = f"{dir_geo}, Región de Valparaíso, Chile"
+            muestra.append({
+                "etiqueta": iniciales,
+                "curso": curso,
+                "comuna": comuna,
+                "direccion_geo": dir_geo,
+            })
+
+        return {
+            "anio": anio,
+            "id_establecimiento": establecimiento_id,
+            "nombre_colegio": nombre_colegio,
+            "rbd": rbd,
+            "muestra": muestra,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error al obtener muestra geo: " + str(e))
+    finally:
+        cur.close()
+        conn.close()

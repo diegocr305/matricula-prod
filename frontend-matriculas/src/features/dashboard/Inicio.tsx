@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Users, UserMinus, GraduationCap, ChevronDown, ChevronUp, BarChart3, ChevronRight, AlertTriangle, FileSignature, ClipboardCheck } from 'lucide-react';
 import { useInicio2 } from './hooks/useInicio2';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import SemaforoCalidad from './components/SemaforoCalidad';
+import MapaEjemplo from './components/MapaEjemplo';
 
 export default function Inicio() {
   const {
@@ -479,6 +481,10 @@ export default function Inicio() {
             </div>
 
           </div>
+
+          {/* Semáforo de calidad del dato + Mapa de georreferenciación */}
+          <SemaforoCalidad anio={anioSeleccionado} />
+          <MapaEjemplo anio={anioSeleccionado} />
         </>
       )}
     </div>
