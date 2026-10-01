@@ -11,13 +11,18 @@ export default function Inicio() {
       
       {/* MENSAJE DE BIENVENIDA */}
       <div className="bg-white px-6 py-5 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-red-600">
-        <h1 className="text-xl font-bold text-blue-950 mb-1">
-          Bienvenido, {usuario ? usuario.nombre : 'Funcionario'}
-        </h1>
-        <p className="text-gray-500 text-sm">
-          Sistema Oficial de Registro General de Matrículas (RGM) - SLEP Valparaíso.
-          ¿Qué acción desea realizar?
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-blue-950 mb-1">
+              Bienvenido, {usuario ? usuario.nombre : 'Funcionario'}
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Sistema Oficial de Registro General de Matrículas (RGM) - SLEP Valparaíso.
+              ¿Qué acción desea realizar?
+            </p>
+          </div>
+          <img src="/images/logo-dep.png" alt="Dirección de Educación Pública" className="h-12 w-auto object-contain hidden sm:block opacity-90 shrink-0" />
+        </div>
       </div>
 
       {/* 🌟 GRID DINÁMICO: 4 columnas si es admin, 3 columnas si es colegio */}

@@ -76,7 +76,7 @@ def generar_certificado_pdf(datos: dict, tipo_documento: str, codigo_verificacio
 
     # Rutas de Imágenes
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ruta_mineduc = os.path.join(base_dir, "static", "mineduc.jpg")
+    ruta_mineduc = os.path.join(base_dir, "static", "mineduc.monocromo.png")   # Logo oficial monocromo Mineduc
     ruta_slep = os.path.join(base_dir, "static", "logo-slep.negro.png")
     ruta_marca_agua = os.path.join(base_dir, "static", "logo-slep.negro.opaco.png")
 
