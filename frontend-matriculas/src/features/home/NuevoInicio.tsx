@@ -18,7 +18,6 @@ export default function Inicio() {
             </h1>
             <p className="text-gray-500 text-sm">
               Sistema Oficial de Registro General de Matrículas (RGM) - SLEP Valparaíso.
-              ¿Qué acción desea realizar?
             </p>
           </div>
 

@@ -18,9 +18,9 @@ export default function Footer() {
 
       {/* COLUMNAS */}
       <div className="max-w-6xl mx-auto px-9 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-stretch">
 
-          {/* COLUMNA 1: Logo DEP */}
+          {/* COLUMNA 1: Logo DEP (centrado vertical en la altura de la fila) */}
           <div className="flex justify-center md:justify-start items-center">
             <img
               src="/images/logo-dep.png"
@@ -29,19 +29,7 @@ export default function Footer() {
             />
           </div>
 
-          {/* COLUMNA 2: Soporte del sistema */}
-          <div className="flex flex-col gap-1.5 text-center md:text-left">
-            <h3 className="text-[11px] font-bold uppercase tracking-wide text-blue-300 font-['gobCL',_sans-serif] mb-1">
-              Soporte del sistema
-            </h3>
-            <p className="flex items-center justify-center md:justify-start gap-2 text-sm font-bold text-white">
-              <Code2 size={15} className="shrink-0 text-blue-300" />
-              Desarrollado por SLEP Valparaíso
-            </p>
-            <p className="text-sm font-bold text-white">Área de Tecnología e Informática</p>
-          </div>
-
-          {/* COLUMNA 3: Contacto */}
+          {/* COLUMNA 2: Contacto */}
           <div className="flex flex-col gap-1.5 text-center md:text-left">
             <h3 className="text-[11px] font-bold uppercase tracking-wide text-blue-300 font-['gobCL',_sans-serif] mb-1">
               Contacto
@@ -63,7 +51,7 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* COLUMNA 4: Marco normativo */}
+          {/* COLUMNA 3: Marco normativo */}
           <div className="flex flex-col gap-1.5 text-center md:text-left">
             <h3 className="text-[11px] font-bold uppercase tracking-wide text-blue-300 font-['gobCL',_sans-serif] mb-1">
               Marco normativo
@@ -73,6 +61,18 @@ export default function Footer() {
               Registro General de Matrícula conforme a la Resolución Exenta 0030/2021 (Superintendencia de Educación).
             </p>
           </div>
+
+          {/* COLUMNA 4: Soporte del sistema */}
+          <div className="flex flex-col gap-1.5 text-center md:text-left">
+            <h3 className="text-[11px] font-bold uppercase tracking-wide text-blue-300 font-['gobCL',_sans-serif] mb-1">
+              Soporte del sistema
+            </h3>
+            <p className="flex items-center justify-center md:justify-start gap-2 text-sm font-bold text-white">
+              <Code2 size={15} className="shrink-0 text-blue-300" />
+              Desarrollado por SLEP Valparaíso
+            </p>
+            <p className="text-sm font-bold text-white">Área de Tecnología e Informática</p>
+          </div>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ export default function Footer() {
       <div className="bg-[#1d2650] border-t border-white/10">
         <div className="max-w-6xl mx-auto px-9 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-1">
           <p className="text-[11px] text-blue-200 text-center sm:text-left">
-            © {anio} SLEP Valparaíso · Sistema de Registro General de Matrícula Digital.
+            © {anio} SLEP Valparaíso · Sistema de Registro General de Matrícula.
             Todos los derechos reservados.
           </p>
           <span className="flex items-center gap-1.5 text-[11px] text-blue-300 shrink-0">
