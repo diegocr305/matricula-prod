@@ -21,7 +21,7 @@ export default function Inicio() {
               ¿Qué acción desea realizar?
             </p>
           </div>
-          <img src="/images/logo-dep.png" alt="Dirección de Educación Pública" className="h-12 w-auto object-contain hidden sm:block opacity-90 shrink-0" />
+
         </div>
       </div>
 

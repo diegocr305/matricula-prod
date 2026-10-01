@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { Home, FolderOpen, Users, LogOut, Activity, PieChart} from 'lucide-react';
 import { useLayout } from './hooks/useLayout';
+import Footer from './Footer';
 
 export default function Layout() {
   const {
@@ -164,8 +165,13 @@ export default function Layout() {
       </div>
       
       {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 overflow-auto p-6 lg:p-8 bg-[#EDF0F5]">
-        <Outlet context={{ colegioSeleccionado }} />
+      <main className="flex-1 overflow-auto bg-[#EDF0F5]">
+        <div className="p-6 lg:p-8">
+          <Outlet context={{ colegioSeleccionado }} />
+        </div>
+
+        {/* FOOTER INSTITUCIONAL */}
+        <Footer />
       </main>
     </div>
   );
