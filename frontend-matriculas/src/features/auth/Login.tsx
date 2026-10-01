@@ -1,17 +1,11 @@
-import React from 'react';
-import { Lock, Mail, ShieldCheck, Clock } from 'lucide-react';
+import { ShieldCheck, Clock } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useLogin } from './hooks/useLogin';
 
 export default function Login() {
   const {
-    email, setEmail,
-    password, setPassword,
     error, setError,
     mensajeExpiracion,
-    rol, setRol,
-    cargando,
-    handleLogin,
     handleGoogleSuccess
   } = useLogin();
 
@@ -56,18 +50,16 @@ export default function Login() {
             </div>
           )}
 
-          <div className="mb-6">
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">1. Seleccione su Perfil Institucional</label>
-            <select 
-              value={rol} onChange={(e) => setRol(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent text-sm bg-gray-50 focus:bg-white font-medium text-gray-700 cursor-pointer"
-            >
-              <option value="COLEGIO">Establecimiento Educacional</option>
-              <option value="SLEP">Administración Central (SLEP)</option>
-            </select>
+          <div className="text-center mb-6">
+            <p className="text-sm text-gray-600 font-medium">
+              Inicie sesión con su cuenta institucional
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              El sistema reconoce su perfil automáticamente según su correo.
+            </p>
           </div>
 
-          <div className="mb-6 flex justify-center">
+          <div className="flex justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setError('El inicio de sesión con Google fue cancelado o falló.')}
@@ -77,60 +69,6 @@ export default function Login() {
               shape="rectangular"
             />
           </div>
-
-          <div className="relative flex py-4 items-center">
-            <div className="flex-grow border-t border-gray-300"></div>
-            <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-bold">O INGRESE CON CONTRASEÑA</span>
-            <div className="flex-grow border-t border-gray-300"></div>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Correo Institucional</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={18} className="text-gray-400" />
-                </div>
-                <input 
-                  type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent text-sm bg-gray-50 focus:bg-white transition-colors"
-                  placeholder="usuario@slepvalparaiso.cl"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Contraseña</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={18} className="text-gray-400" />
-                </div>
-                <input 
-                  type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent text-sm bg-gray-50 focus:bg-white transition-colors"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Perfil de Acceso</label>
-              <select 
-                value={rol} onChange={(e) => setRol(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent text-sm bg-gray-50 focus:bg-white font-medium text-gray-700 cursor-pointer"
-              >
-                <option value="COLEGIO">Establecimiento Educacional</option>
-                <option value="SLEP">Administración Central (SLEP)</option>
-              </select>
-            </div>
-
-            <button 
-              type="submit" disabled={cargando}
-              className="w-full bg-blue-900 text-white font-bold py-3 rounded-md hover:bg-blue-800 transition-colors disabled:opacity-50 mt-4 shadow-md"
-            >
-              {cargando ? 'Verificando credenciales...' : 'Ingresar al Sistema'}
-            </button>
-          </form>
         </div>
       </div>
       

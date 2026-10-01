@@ -102,12 +102,9 @@ def login_google_service(credenciales):
         usuario_db = cur.fetchone()
 
         if usuario_db and usuario_db[5]:
+            # El rol lo determina el correo (no un portal elegido en el frontend):
+            # el login con Google entra directo con el rol real del usuario.
             rol_db = usuario_db[3]
-            if not _rol_valido_para_portal(credenciales.rol, rol_db):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Tu correo es válido, pero no tienes permisos para acceder a este portal.",
-                )
             token = crear_token_acceso(
                 {"sub": usuario_db[1], "id_usuario": usuario_db[0], "rol": rol_db, "id_establecimiento": usuario_db[4]},
                 timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
@@ -134,15 +131,10 @@ def login_google_service(credenciales):
                 detail="Tu correo es válido, pero no está autorizado en el sistema de matrículas.",
             )
 
+        # El rol lo determina el correo autorizado (no un portal elegido en el frontend).
         rol_db = acceso[1]
         id_establecimiento = acceso[2]
         nombre_estab = acceso[3]
-
-        if not _rol_valido_para_portal(credenciales.rol, rol_db):
-            raise HTTPException(
-                status_code=403,
-                detail="Tu correo está autorizado, pero no para este portal.",
-            )
 
         # Aseguramos una fila en 'usuario' para tener trazabilidad y satisfacer
         # las FK de id_usuario_ejecutor al crear/editar matrículas.

@@ -55,13 +55,11 @@ export const useLogin = () => {
     setCargando(true);
 
     try {
+      // El rol lo determina el backend según el correo; no se envía desde aquí.
       const respuesta = await fetch(`${API_BASE_URL}/login/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          token: credentialResponse.credential, 
-          rol: rol 
-        })
+        body: JSON.stringify({ token: credentialResponse.credential })
       });
 
       const datos = await respuesta.json();
