@@ -31,8 +31,8 @@ export default function Login() {
               /> 
           </div>          
           
-          <p className="text-white mt-4 text-base font-bold">RGM 2027</p>
-          <p className="text-blue-100 text-xs font-medium">Registro General de Matrículas</p>
+          <p className="text-white mt-4 text-2xl font-bold">RGM 2027</p>
+          <p className="text-blue-100 text-sm font-medium mt-0.5">Registro General de Matrículas</p>
         </div>
 
         <div className="p-8">
