@@ -1,4 +1,4 @@
-import { Mail, Code2, MapPin, ShieldCheck, Clock } from 'lucide-react';
+import { Mail, Code2, MapPin, ShieldCheck, Clock, Tag } from 'lucide-react';
 
 /**
  * Footer institucional del Sistema RGM Digital — SLEP Valparaíso.
@@ -74,13 +74,19 @@ export default function Footer() {
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Copyright */}
-        <div className="mt-6 pt-3 border-t border-white/15">
-          <p className="text-[11px] text-blue-200 text-center">
+      {/* FRANJA INFERIOR: copyright + versión del sistema */}
+      <div className="bg-[#1d2650] border-t border-white/10">
+        <div className="max-w-6xl mx-auto px-9 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-1">
+          <p className="text-[11px] text-blue-200 text-center sm:text-left">
             © {anio} SLEP Valparaíso · Sistema de Registro General de Matrícula Digital.
             Todos los derechos reservados.
           </p>
+          <span className="flex items-center gap-1.5 text-[11px] text-blue-300 shrink-0">
+            <Tag size={12} className="shrink-0" />
+            Versión {__APP_VERSION__}
+          </span>
         </div>
       </div>
     </footer>
