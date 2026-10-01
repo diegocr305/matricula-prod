@@ -31,14 +31,14 @@ export default function Layout() {
           <div className="w-1/2 bg-[#FF1D3D]"></div>
         </div>
 
-        <div className="px-9 h-16 flex items-center justify-between mt-1">
+        <div className="px-9 h-20 flex items-center justify-between mt-1">
                 
           {/* IZQUIERDA: Logo */}
           <Link to="/" className="flex items-center gap-3 group cursor-pointer focus:outline-none">
             <img 
               src="/images/logo_slep.png" 
               alt="Logo SLEP Valparaíso" 
-              className="h-11 w-auto object-contain group-hover:opacity-90 transition-opacity" 
+              className="h-14 w-auto object-contain group-hover:opacity-90 transition-opacity" 
             />
           </Link>
 
@@ -165,8 +165,8 @@ export default function Layout() {
       </div>
       
       {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 overflow-auto bg-[#EDF0F5]">
-        <div className="p-6 lg:p-8">
+      <main className="flex-1 overflow-auto bg-[#EDF0F5] flex flex-col">
+        <div className="flex-1 p-6 lg:p-8">
           <Outlet context={{ colegioSeleccionado }} />
         </div>
 
