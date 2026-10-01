@@ -60,7 +60,9 @@ export default function Matriculas() {
           </button>
           {puedeEditar && (
             <>
-              {puedeCargarSIGE && (
+              {/* Botón "Cargar SIGE / CSV" oculto a petición. Para reactivarlo,
+                  cambiar `false` por `puedeCargarSIGE`. */}
+              {false && puedeCargarSIGE && (
                 <>
                   <input 
                     type="file" accept=".csv, .xls, .xlsx" 
