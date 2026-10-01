@@ -20,8 +20,6 @@ export default function Login() {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200">
         
       <div className="bg-blue-950 p-8 text-center border-b-4 border-red-600">
-          <p className="text-blue-200 text-xs font-bold tracking-widest uppercase mb-4">Ministerio de Educación</p>
-          
           <div className="flex flex-col items-center justify-center my-2">
               <img 
                 src="/images/logo_slep.png"
