@@ -1,4 +1,4 @@
-import { Mail, Code2, MapPin, ShieldCheck } from 'lucide-react';
+import { Mail, Code2, MapPin, ShieldCheck, Clock } from 'lucide-react';
 
 /**
  * Footer institucional del Sistema RGM Digital — SLEP Valparaíso.
@@ -41,7 +41,7 @@ export default function Footer() {
               <Code2 size={15} className="shrink-0 text-blue-300" />
               Desarrollado por SLEP Valparaíso
             </p>
-            <p className="text-xs text-blue-200">Área de Informática</p>
+            <p className="text-sm font-bold text-white">Área de Tecnología e Informática</p>
           </div>
 
           {/* COLUMNA 3: Contacto */}
@@ -49,6 +49,10 @@ export default function Footer() {
             <h3 className="text-[11px] font-bold uppercase tracking-wide text-blue-300 font-['gobCL',_sans-serif] mb-1">
               Contacto
             </h3>
+            <p className="flex items-start justify-center md:justify-start gap-2 text-xs text-blue-200">
+              <MapPin size={14} className="shrink-0 mt-0.5" />
+              Blanco 937, 2° piso, Valparaíso
+            </p>
             <a
               href="mailto:tecnologia@slepvalparaiso.cl"
               className="flex items-center justify-center md:justify-start gap-2 text-xs text-blue-200 hover:text-white transition-colors"
@@ -56,9 +60,9 @@ export default function Footer() {
               <Mail size={14} className="shrink-0" />
               tecnologia@slepvalparaiso.cl
             </a>
-            <p className="flex items-center justify-center md:justify-start gap-2 text-xs text-blue-200">
-              <MapPin size={14} className="shrink-0" />
-              Blanco 937, 2° piso, Valparaíso
+            <p className="flex items-start justify-center md:justify-start gap-2 text-xs text-blue-200">
+              <Clock size={14} className="shrink-0 mt-0.5" />
+              <span>Lun–Jue: 9:00–14:00 / 15:00–17:00<br />Vie: 9:00–14:00</span>
             </p>
           </div>
 
