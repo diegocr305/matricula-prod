@@ -18,18 +18,15 @@ export default function Footer() {
 
       {/* COLUMNAS */}
       <div className="max-w-6xl mx-auto px-9 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
 
-          {/* COLUMNA 1: Logo DEP + identidad */}
-          <div className="flex flex-col items-center md:items-start gap-2">
+          {/* COLUMNA 1: Logo DEP */}
+          <div className="flex justify-center md:justify-start items-center">
             <img
               src="/images/logo-dep.png"
               alt="Dirección de Educación Pública · Ministerio de Educación"
-              className="h-24 w-auto object-contain rounded"
+              className="h-32 w-auto object-contain rounded"
             />
-            <p className="text-[11px] text-blue-200 leading-relaxed text-center md:text-left">
-              Servicio Local de Educación Pública de Valparaíso.
-            </p>
           </div>
 
           {/* COLUMNA 2: Soporte del sistema */}
