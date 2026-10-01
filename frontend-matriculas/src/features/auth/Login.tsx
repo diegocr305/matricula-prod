@@ -1,6 +1,7 @@
 import { ShieldCheck, Clock } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useLogin } from './hooks/useLogin';
+import Footer from '../../components/Footer';
 
 export default function Login() {
   const {
@@ -10,14 +11,16 @@ export default function Login() {
   } = useLogin();
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
-      {/* Footer/Header Institucional Falso para dar contexto */}
-      <div className="absolute top-0 w-full h-2 flex">
+    <div className="min-h-screen bg-slate-100 flex flex-col">
+      {/* Franja superior institucional (Gobierno de Chile) */}
+      <div className="w-full h-2 flex shrink-0">
         <div className="w-1/2 bg-blue-900"></div>
         <div className="w-1/2 bg-red-600"></div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200">
+      {/* Zona de acceso (centrada, ocupa el espacio disponible) */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200">
         
       <div className="bg-blue-950 p-8 text-center border-b-4 border-red-600">
           <div className="flex flex-col items-center justify-center my-2">
@@ -70,9 +73,13 @@ export default function Login() {
         </div>
       </div>
       
-      <p className="mt-8 text-xs text-gray-500 font-medium">
-        © {new Date().getFullYear()} Servicio Local de Educación Pública Valparaíso. Todos los derechos reservados.
-      </p>
+        <p className="mt-8 text-xs text-gray-500 font-medium">
+          © {new Date().getFullYear()} Servicio Local de Educación Pública Valparaíso. Todos los derechos reservados.
+        </p>
+      </div>
+
+      {/* Footer institucional */}
+      <Footer />
     </div>
   );
 }

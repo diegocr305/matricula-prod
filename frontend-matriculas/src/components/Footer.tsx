@@ -42,16 +42,56 @@ export default function Footer() {
       <div className="px-9 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
 
-          {/* COLUMNA 1: Identidad institucional */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-white font-['gobCL',_sans-serif]">
-              SLEP Valparaíso
-            </h3>
+          {/* COLUMNA 1: Identidad institucional (logos Mineduc + DEP) */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <img
+                src="/images/mineduc.monocromo.blanco.png"
+                alt="Ministerio de Educación · Gobierno de Chile"
+                className="h-16 w-auto object-contain"
+              />
+              <img
+                src="/images/logo-dep.png"
+                alt="Dirección de Educación Pública"
+                className="h-11 w-auto object-contain bg-white/95 rounded px-2 py-1.5"
+              />
+            </div>
             <p className="text-xs text-blue-200 leading-relaxed">
-              Servicio Local de Educación Pública de Valparaíso. Registro General
-              de Matrícula (RGM) Digital, al servicio de los establecimientos
-              educacionales del territorio.
+              Servicio Local de Educación Pública de Valparaíso. Fortaleciendo la
+              educación pública con calidad y equidad. Registro General de Matrícula
+              (RGM) Digital, al servicio de los establecimientos del territorio.
             </p>
+
+            {/* Redes sociales */}
+            <div className="flex items-center gap-3">
+              <a
+                href="https://www.instagram.com/slep_valparaiso"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram SLEP Valparaíso"
+                className="text-blue-200 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full p-2"
+              >
+                <IconInstagram />
+              </a>
+              <a
+                href="https://www.facebook.com/slep_valparaiso"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook SLEP Valparaíso"
+                className="text-blue-200 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full p-2"
+              >
+                <IconFacebook />
+              </a>
+              <a
+                href="https://www.youtube.com/@slep_valparaiso"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube SLEP Valparaíso"
+                className="text-blue-200 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full p-2"
+              >
+                <IconYoutube />
+              </a>
+            </div>
           </div>
 
           {/* COLUMNA 2: Contacto */}
@@ -73,45 +113,14 @@ export default function Footer() {
                   oficinadepartes@slepvalparaiso.cl
                 </a>
               </li>
-              <li className="flex items-center gap-2">
-                <Phone size={14} className="shrink-0" />
-                <span>Mesa central SLEP Valparaíso</span>
+              <li className="flex items-start gap-2">
+                <Phone size={14} className="mt-0.5 shrink-0" />
+                <span>Lun–Jue: 9:00–14:00 / 15:00–17:00<br />Vie: 9:00–14:00</span>
               </li>
             </ul>
-
-            {/* Redes sociales */}
-            <div className="flex items-center gap-3 mt-1">
-              <a
-                href="https://www.instagram.com/slep_valparaiso"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram SLEP Valparaíso"
-                className="text-blue-200 hover:text-white transition-colors"
-              >
-                <IconInstagram />
-              </a>
-              <a
-                href="https://www.facebook.com/slep_valparaiso"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook SLEP Valparaíso"
-                className="text-blue-200 hover:text-white transition-colors"
-              >
-                <IconFacebook />
-              </a>
-              <a
-                href="https://www.youtube.com/@slep_valparaiso"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="YouTube SLEP Valparaíso"
-                className="text-blue-200 hover:text-white transition-colors"
-              >
-                <IconYoutube />
-              </a>
-            </div>
           </div>
 
-          {/* COLUMNA 3: Desarrollo / soporte técnico + logo DEP */}
+          {/* COLUMNA 3: Soporte técnico del sistema (solo texto) */}
           <div className="flex flex-col gap-3">
             <h3 className="text-sm font-bold uppercase tracking-wide text-white font-['gobCL',_sans-serif]">
               Soporte del sistema
@@ -126,14 +135,6 @@ export default function Footer() {
               <Mail size={14} className="shrink-0" />
               tecnologia@slepvalparaiso.cl
             </a>
-
-            <div className="mt-2">
-              <img
-                src="/images/logo-dep.png"
-                alt="Dirección de Educación Pública"
-                className="h-12 w-auto object-contain bg-white/95 rounded px-3 py-2"
-              />
-            </div>
           </div>
         </div>
 
