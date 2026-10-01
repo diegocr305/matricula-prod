@@ -182,9 +182,25 @@ export default function Inicio() {
     colorCabecera = vistaPrincipal === 'retiros' ? "bg-orange-700" : "bg-emerald-700"; 
   }
 
-  // Colores para el acordeón dependiendo de la vista
-  const colorTema = vistaPrincipal === 'activos' ? 'indigo' : 'red';
-  const colorSubTema = vistaPrincipal === 'activos' ? 'emerald' : 'orange';
+  // Clases de color para el acordeón, ESTÁTICAS (Tailwind no compila clases
+  // construidas por interpolación como `bg-${x}-900`, por eso se definen completas).
+  const esRetiros = vistaPrincipal === 'retiros';
+  const tema = esRetiros
+    ? { headerOn: 'bg-red-900 text-white', panel: 'bg-red-50/30',
+        badgeOn: 'bg-white text-red-800', badgeOff: 'bg-red-100 text-red-800' }
+    : { headerOn: 'bg-indigo-900 text-white', panel: 'bg-indigo-50/30',
+        badgeOn: 'bg-white text-indigo-800', badgeOff: 'bg-indigo-100 text-indigo-800' };
+  const sub = esRetiros
+    ? { border: 'border-orange-100', nivelOn: 'bg-orange-700 text-white',
+        nivelOff: 'hover:bg-orange-50 text-gray-700', chevron: 'text-orange-600',
+        badgeOn: 'bg-white text-orange-800', badgeOff: 'bg-orange-100 text-orange-800',
+        panel: 'bg-orange-50/50 border-orange-100', cursoBorder: 'border-orange-200',
+        cursoText: 'text-orange-900' }
+    : { border: 'border-emerald-100', nivelOn: 'bg-emerald-700 text-white',
+        nivelOff: 'hover:bg-emerald-50 text-gray-700', chevron: 'text-emerald-600',
+        badgeOn: 'bg-white text-emerald-800', badgeOff: 'bg-emerald-100 text-emerald-800',
+        panel: 'bg-emerald-50/50 border-emerald-100', cursoBorder: 'border-emerald-200',
+        cursoText: 'text-emerald-900' };
 
   return (
     <div className="space-y-6">
@@ -367,11 +383,11 @@ export default function Inicio() {
                       <button 
                         type="button"
                         onClick={() => toggleTipo(categoria.tipo)}
-                        className={`w-full flex justify-between items-center p-3 sm:p-4 transition-colors ${estaCategoriaExpandida ? `bg-${colorTema}-900 text-white` : 'bg-gray-50 hover:bg-gray-100 text-gray-800'}`}
+                        className={`w-full flex justify-between items-center p-3 sm:p-4 transition-colors ${estaCategoriaExpandida ? tema.headerOn : 'bg-gray-50 hover:bg-gray-100 text-gray-800'}`}
                       >
                         <span className="font-extrabold text-sm sm:text-base text-left tracking-wide">{categoria.tipo}</span>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className={`font-black px-3 py-1 rounded-full text-xs shadow-sm ${estaCategoriaExpandida ? `bg-white text-${colorTema}-900` : `bg-${colorTema}-100 text-${colorTema}-900`}`}>
+                          <span className={`font-black px-3 py-1 rounded-full text-xs shadow-sm ${estaCategoriaExpandida ? tema.badgeOn : tema.badgeOff}`}>
                             {categoria.total}
                           </span>
                           {estaCategoriaExpandida ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -379,34 +395,34 @@ export default function Inicio() {
                       </button>
 
                       {estaCategoriaExpandida && (
-                        <div className={`bg-${colorTema}-50/30 p-2 sm:p-4 animate-in slide-in-from-top-2 space-y-2`}>
+                        <div className={`${tema.panel} p-2 sm:p-4 animate-in slide-in-from-top-2 space-y-2`}>
                           {categoria.niveles.map((nivel: any, indexNiv: number) => {
                             const esteNivelExpandido = nivelExpandido === nivel.display;
 
                             return (
-                              <div key={indexNiv} className={`border border-${colorSubTema}-100 rounded-lg bg-white overflow-hidden shadow-sm`}>
+                              <div key={indexNiv} className={`border ${sub.border} rounded-lg bg-white overflow-hidden shadow-sm`}>
                                 <button 
                                   type="button"
                                   onClick={() => toggleNivel(nivel.display, categoria.tipo)}
-                                  className={`w-full flex justify-between items-center p-3 transition-colors ${esteNivelExpandido ? `bg-${colorSubTema}-700 text-white` : `hover:bg-${colorSubTema}-50 text-gray-700`}`}
+                                  className={`w-full flex justify-between items-center p-3 transition-colors ${esteNivelExpandido ? sub.nivelOn : sub.nivelOff}`}
                                 >
                                   <div className="flex items-center gap-2">
-                                    {!esteNivelExpandido && <ChevronRight size={16} className={`text-${colorSubTema}-600`} />}
+                                    {!esteNivelExpandido && <ChevronRight size={16} className={sub.chevron} />}
                                     <span className="font-bold text-sm text-left">{nivel.display}</span>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <span className={`font-bold px-2.5 py-0.5 rounded text-xs ${esteNivelExpandido ? `bg-white text-${colorSubTema}-800` : `bg-${colorSubTema}-100 text-${colorSubTema}-800`}`}>
+                                    <span className={`font-bold px-2.5 py-0.5 rounded text-xs ${esteNivelExpandido ? sub.badgeOn : sub.badgeOff}`}>
                                       {nivel.total}
                                     </span>
                                   </div>
                                 </button>
 
                                 {esteNivelExpandido && (
-                                  <div className={`p-3 bg-${colorSubTema}-50/50 border-t border-${colorSubTema}-100`}>
+                                  <div className={`p-3 border-t ${sub.panel}`}>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                       {nivel.cursos.map((curso: any, idx: number) => (
-                                        <div key={idx} className={`flex justify-between items-center bg-white border border-${colorSubTema}-200 px-3 py-2 rounded-md`}>
-                                          <span className={`text-${colorSubTema}-900 text-xs font-bold truncate pr-2`} title={curso.nombre}>
+                                        <div key={idx} className={`flex justify-between items-center bg-white border ${sub.cursoBorder} px-3 py-2 rounded-md`}>
+                                          <span className={`${sub.cursoText} text-xs font-bold truncate pr-2`} title={curso.nombre}>
                                             {curso.nombre}
                                           </span>
                                           <span className="font-black text-gray-600 text-xs">
