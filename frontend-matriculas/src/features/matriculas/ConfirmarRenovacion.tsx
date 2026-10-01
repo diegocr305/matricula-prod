@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { UserCheck, Home, HeartPulse, Loader2, AlertTriangle, ChevronLeft, Copy, Users } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import { ModalExito } from './components/ModalExito';
+import Stepper from '../../components/Stepper';
 
 // Pantalla de "Confirmar Renovación" (Opcion A del piloto):
 // El apoderado viene presencialmente, el funcionario ACTUALIZA sus datos y los del
@@ -242,6 +243,16 @@ export default function ConfirmarRenovacion() {
   const inputCls = 'w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500';
   const labelCls = 'block text-xs font-bold text-gray-600 mb-1';
 
+  // Progreso visual del stepper: avanza según se completan las secciones obligatorias.
+  const domicilioOk = !!(domEstudiante.calle.trim() && domEstudiante.numero.trim() && domEstudiante.comuna.trim());
+  const apoderadoOk = !!(
+    apoderado.rut.trim() && apoderado.nombres.trim() && apoderado.apellido_paterno.trim() &&
+    apoderado.telefono.trim() && apoderado.correo.trim() &&
+    apoderado.calle.trim() && apoderado.numero.trim() && apoderado.comuna.trim()
+  );
+  // 1 = domicilio pendiente, 2 = apoderado pendiente, 3 = listo para firmar.
+  const pasoRenovacion = !domicilioOk ? 1 : !apoderadoOk ? 2 : 3;
+
   if (cargando) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500">
@@ -265,6 +276,18 @@ export default function ConfirmarRenovacion() {
           <span className="px-3 py-1 bg-gray-100 rounded-lg"><strong>Estudiante:</strong> {nombreEstudiante || '—'}</span>
           <span className="px-3 py-1 bg-gray-100 rounded-lg"><strong>RUT:</strong> {rutEstudiante}</span>
           {curso && <span className="px-3 py-1 bg-blue-50 text-blue-800 rounded-lg"><strong>Curso {anio}:</strong> {curso}</span>}
+        </div>
+
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          <Stepper
+            pasoActual={pasoRenovacion}
+            pasos={[
+              { titulo: 'Domicilio', descripcion: 'Datos del estudiante' },
+              { titulo: 'Apoderado', descripcion: 'Titular y contacto' },
+              { titulo: 'Firma', descripcion: 'Enviar a Clave Única' },
+            ]}
+            className="max-w-xl mx-auto"
+          />
         </div>
       </div>
 

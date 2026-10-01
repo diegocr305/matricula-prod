@@ -2,6 +2,7 @@
 import React from 'react';
 import { Search, UserCheck, AlertCircle, CheckCircle, Download, Mail, ArrowRight, ChevronRight, ChevronLeft, AlertTriangle, Calendar, Edit3, Loader2, Globe, Building2 } from 'lucide-react';
 import { useNuevaMatricula } from './hooks/useNuevaMatricula';
+import Stepper from '../../components/Stepper';
 import { ModalFaltantes } from './components/ModalFaltantes';
 import { ModalExito } from './components/ModalExito';
 import { ModalSalida } from './components/ModalSalida';
@@ -84,16 +85,18 @@ export default function NuevaMatricula() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">Registrar Nueva Matrícula</h2>
-        
-        <div className="hidden sm:flex items-center gap-2 text-sm font-bold">
-          <span className={`px-3 py-1 rounded-full ${pasoActual >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>1. Identificación</span>
-          <div className={`w-8 h-1 ${pasoActual >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-          <span className={`px-3 py-1 rounded-full ${pasoActual >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>2. Académico</span>
-          <div className={`w-8 h-1 ${pasoActual >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-          <span className={`px-3 py-1 rounded-full ${pasoActual >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>3. Autorizaciones</span>
-        </div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Registrar Nueva Matrícula</h2>
+
+        <Stepper
+          pasoActual={pasoActual}
+          pasos={[
+            { titulo: 'Identificación', descripcion: 'Estudiante y ficha' },
+            { titulo: 'Académico', descripcion: 'Establecimiento y curso' },
+            { titulo: 'Autorizaciones', descripcion: 'Documentos y firma' },
+          ]}
+          className="max-w-2xl mx-auto"
+        />
       </div>
       
       <form onSubmit={handleSubmit}>
