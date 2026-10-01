@@ -17,10 +17,17 @@ export default function Footer() {
       </div>
 
       {/* Barra compacta */}
-      <div className="max-w-6xl mx-auto px-9 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <p className="text-xs font-bold text-white tracking-wide">
-          Desarrollado por SLEP Valparaíso · Área de Informática
-        </p>
+      <div className="max-w-6xl mx-auto px-9 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <img
+            src="/images/logo-dep.png"
+            alt="Dirección de Educación Pública · Ministerio de Educación"
+            className="h-10 w-auto object-contain rounded-sm"
+          />
+          <p className="text-xs font-bold text-white tracking-wide">
+            Desarrollado por SLEP Valparaíso · Área de Informática
+          </p>
+        </div>
 
         <div className="flex items-center gap-5 text-[11px] text-blue-200">
           <a
