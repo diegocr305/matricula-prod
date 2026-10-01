@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Users, UserMinus, GraduationCap, ChevronDown, ChevronUp, BarChart3, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Users, UserMinus, GraduationCap, ChevronDown, ChevronUp, BarChart3, ChevronRight, AlertTriangle, FileSignature, ClipboardCheck } from 'lucide-react';
 import { useInicio2 } from './hooks/useInicio2';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -274,6 +274,77 @@ export default function Inicio() {
               </div>
             </div>
           </div>
+
+          {/* SECCIÓN: PROCESO DE RENOVACIÓN (piloto) — solo si hay datos de renovación */}
+          {estadisticas?.renovacion?.activa && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-indigo-900 to-blue-900 text-white">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <FileSignature size={20} /> Proceso de Renovación de Matrícula
+                </h3>
+                <p className="text-blue-200 text-xs mt-0.5">
+                  Avance de la renovación y firma de apoderados {anioSeleccionado ? `· Año ${anioSeleccionado}` : ''}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Barra de avance de firmas */}
+                <div>
+                  <div className="flex justify-between items-end mb-2">
+                    <span className="text-sm font-bold text-gray-700">Avance de firmas</span>
+                    <span className="text-2xl font-black text-emerald-600">{estadisticas.renovacion.avance_pct}%</span>
+                  </div>
+                  <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{ width: `${estadisticas.renovacion.avance_pct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {estadisticas.renovacion.firmada} de {estadisticas.renovacion.total_a_renovar} matrículas firmadas por el apoderado.
+                  </p>
+                </div>
+
+                {/* Tarjetas por estado */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+                    <p className="text-2xl font-black text-blue-700">{estadisticas.renovacion.por_renovar}</p>
+                    <p className="text-[11px] font-bold text-blue-900 uppercase tracking-wide">🔄 Por renovar</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-100">
+                    <p className="text-2xl font-black text-amber-700">{estadisticas.renovacion.pendiente_firma}</p>
+                    <p className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">✍️ Pendiente firma</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-100">
+                    <p className="text-2xl font-black text-emerald-700">{estadisticas.renovacion.firmada}</p>
+                    <p className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">✅ Firmada</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
+                    <p className="text-2xl font-black text-gray-600">{estadisticas.renovacion.egresado + estadisticas.renovacion.no_renueva}</p>
+                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">🎓 Egresa / No renueva</p>
+                  </div>
+                </div>
+
+                {/* Calidad del dato */}
+                {estadisticas?.calidad_dato?.total > 0 && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200">
+                    <ClipboardCheck className="text-slate-500 mt-0.5 shrink-0" size={20} />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-slate-700">
+                        Calidad del dato: {estadisticas.calidad_dato.pct_con_apoderado}% con apoderado registrado
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {estadisticas.calidad_dato.con_apoderado} de {estadisticas.calidad_dato.total} estudiantes tienen apoderado cargado.
+                        {estadisticas.calidad_dato.sin_apoderado > 0 && (
+                          <span className="text-amber-700 font-semibold"> {estadisticas.calidad_dato.sin_apoderado} pendientes de completar en la renovación.</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             

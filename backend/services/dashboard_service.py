@@ -189,6 +189,57 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
         # Ordenar el historial de menor a mayor anio para el grafico
         historico_real = sorted(list(historico_dict.values()), key=lambda x: x["anio"])
 
+        # --- KPIs DEL PROCESO DE RENOVACION (piloto) ---
+        # Desglose por estado_renovacion para el anio/colegio seleccionado. Solo
+        # considera matriculas que participan del flujo (estado_renovacion NO NULL).
+        cur.execute(f"""
+            SELECT estado_renovacion, COUNT(*)
+            FROM matricula
+            WHERE estado_renovacion IS NOT NULL {filtros_sql}
+            GROUP BY estado_renovacion
+        """, tuple(parametros))
+        renov_raw = {row[0]: row[1] for row in cur.fetchall()}
+
+        # Universo "a renovar" = las que siguen en el flujo (excluye Egresado y No renueva).
+        por_renovar = renov_raw.get("Por renovar", 0)
+        pendiente_firma = renov_raw.get("Pendiente firma", 0)
+        firmada = renov_raw.get("Firmada", 0)
+        no_renueva = renov_raw.get("No renueva", 0)
+        egresado = renov_raw.get("Egresado", 0)
+        total_a_renovar = por_renovar + pendiente_firma + firmada
+        avance_pct = round((firmada / total_a_renovar) * 100, 1) if total_a_renovar > 0 else 0.0
+
+        renovacion = {
+            "activa": total_a_renovar > 0 or egresado > 0 or no_renueva > 0,
+            "por_renovar": por_renovar,
+            "pendiente_firma": pendiente_firma,
+            "firmada": firmada,
+            "no_renueva": no_renueva,
+            "egresado": egresado,
+            "total_a_renovar": total_a_renovar,
+            "avance_pct": avance_pct,
+        }
+
+        # --- CALIDAD DEL DATO ---
+        # % de estudiantes (de los activos del filtro) con apoderado principal cargado.
+        cur.execute(f"""
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE e.id_apoderado_principal IS NOT NULL) AS con_apoderado
+            FROM matricula m
+            JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+            WHERE m.estado IN ('Activa', 'Pendiente Retiro') {filtros_sql.replace('id_establecimiento', 'm.id_establecimiento').replace('anio_escolar', 'm.anio_escolar')}
+        """, tuple(parametros))
+        cal = cur.fetchone()
+        total_cal = cal[0] or 0
+        con_apod = cal[1] or 0
+        calidad_dato = {
+            "total": total_cal,
+            "con_apoderado": con_apod,
+            "sin_apoderado": total_cal - con_apod,
+            "pct_con_apoderado": round((con_apod / total_cal) * 100, 1) if total_cal > 0 else 0.0,
+        }
+
         return {
             "anios_disponibles": anios_disponibles,
             "total_activos": total_activos,
@@ -196,7 +247,9 @@ def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int 
             "por_nivel": por_nivel,
             "por_curso": por_curso,
             "por_curso_retiros": por_curso_retiros,
-            "historico": historico_real
+            "historico": historico_real,
+            "renovacion": renovacion,
+            "calidad_dato": calidad_dato
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al generar estadisticas: " + str(e))

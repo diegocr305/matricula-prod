@@ -10,7 +10,24 @@ export const useInicio2 = () => {
     por_nivel: [],
     por_curso: [],         // 🌟 Desglose de alumnos activos
     por_curso_retiros: [], // 🌟 NUEVO: Desglose de alumnos retirados/inactivos
-    historico: [] as any[] 
+    historico: [] as any[],
+    // KPIs del proceso de renovación (piloto)
+    renovacion: {
+      activa: false,
+      por_renovar: 0,
+      pendiente_firma: 0,
+      firmada: 0,
+      no_renueva: 0,
+      egresado: 0,
+      total_a_renovar: 0,
+      avance_pct: 0,
+    },
+    calidad_dato: {
+      total: 0,
+      con_apoderado: 0,
+      sin_apoderado: 0,
+      pct_con_apoderado: 0,
+    },
   });
   
   const [cargando, setCargando] = useState(true);
