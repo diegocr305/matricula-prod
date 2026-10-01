@@ -56,17 +56,22 @@ npm version prerelease    # 1.0.0-beta.1 -> 1.0.0-beta.2
 ### Footer — `src/components/Footer.tsx`
 - Footer institucional compartido. Fondo azul SLEP `#25306B`, tipografía Museo Sans / gobCL.
 - Franja decorativa superior (celeste `#006BB9` / rojo `#FF1D3D`), estilo Gobierno de Chile.
-- **4 columnas** (`items-center`): 
-  1. Logo DEP grande (`/images/logo-dep.png`, `h-32`). El logo trae su propio fondo azul/rojo,
-     por eso va SIN recuadro blanco (sobre azul se integra). NO reintroducir recuadro.
+- **4 columnas** (`items-stretch`, títulos de columna alineados arriba). Orden actual:
+  1. Logo DEP grande (`/images/logo-dep.png`, `h-32`, centrado vertical en su columna). El
+     logo trae su propio fondo azul/rojo, por eso va SIN recuadro blanco (sobre azul se
+     integra). NO reintroducir recuadro.
   2. Soporte del sistema: "Desarrollado por SLEP Valparaíso" + **"Área de Tecnología e
-     Informática"** (en bold, destacado).
+     Informática"** (en bold, destacado). Decisión del dueño: va JUNTO al logo (2ª posición).
   3. Contacto: dirección (Blanco 937, 2° piso, Valparaíso), correo `tecnologia@slepvalparaiso.cl`,
      horario (Lun–Jue 9:00–14:00 / 15:00–17:00, Vie 9:00–14:00).
   4. Marco normativo: referencia a la Resolución Exenta 0030/2021.
 - **Franja inferior** (barra `#1d2650` más oscura): copyright "© {año} SLEP Valparaíso ·
-  Sistema de Registro General de Matrícula Digital..." a la izquierda y "Versión
-  {__APP_VERSION__}" a la derecha.
+  Sistema de Registro General de Matrícula. Todos los derechos reservados." (SIN la palabra
+  "Digital" — decisión del dueño) a la izquierda y "Versión {__APP_VERSION__}" a la derecha.
+- **Login** (`src/features/auth/Login.tsx`): bajo el logo SLEP muestra "RGM 2027" (`text-2xl`
+  bold blanco) + "Registro General de Matrículas" (`text-sm` celeste). Se quitó "Plataforma
+  Oficial del Registro General de Matrículas". El Home (`NuevoInicio.tsx`) ya no dice "¿Qué
+  acción desea realizar?".
 - Decisiones del dueño (iteradas): NO logo Mineduc, NO redes sociales, NO párrafo descriptivo
   largo; el logo DEP destacado; crédito del Área de Informática visible. Mantener así salvo
   nueva instrucción.
