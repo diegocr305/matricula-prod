@@ -96,7 +96,17 @@ def nombre_valido(nombre_completo: str) -> bool:
 
 
 def separar_nombre(nombre_completo: str):
-    partes = [p for p in limpiar(nombre_completo).split() if p]
+    s = limpiar(nombre_completo)
+    # Formato con coma: "APELLIDO APELLIDO, NOMBRES" (así vienen los titulares del Excel).
+    if "," in s:
+        izq, der = s.split(",", 1)
+        apellidos = [p for p in izq.split() if p]
+        nombres = der.strip()
+        pat = apellidos[0] if apellidos else "Titular"
+        mat = apellidos[1] if len(apellidos) > 1 else None
+        return (nombres[:100] or "Apoderado", pat[:100], (mat[:100] if mat else None))
+    # Formato normal: "NOMBRES APELLIDO APELLIDO".
+    partes = [p for p in s.split() if p]
     if not partes:
         return ("Apoderado", "Titular", None)
     if len(partes) == 1:
