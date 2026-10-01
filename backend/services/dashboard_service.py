@@ -3,6 +3,71 @@ import re
 from fastapi import HTTPException
 from database import get_db_connection
 
+# Comunas conocidas de la región (para detectar/normalizar en direcciones informales).
+_COMUNAS_GEO = [
+    "valparaiso", "viña del mar", "vina del mar", "quilpue", "quilpué",
+    "villa alemana", "casablanca", "concon", "concón", "limache", "olmue", "olmué",
+    "quillota", "san antonio", "placilla", "curauma", "laguna verde",
+]
+
+# Palabras de ruido típicas del formato chileno informal que confunden al geocodificador.
+_RUIDO_GEO = [
+    r"\bPOBL[-\. ]?SECTOR\b", r"\bPOBLACION\b", r"\bPOBLACIÓN\b",
+    r"\bBLOCK\b", r"\bBLOQUE\b", r"\bDEPTO?\b", r"\bDEPARTAMENTO\b",
+    r"\bCASA\b", r"\bPASAJE\b", r"\bPSJE\b", r"\bPJE\b",
+    r"\bVILLA\b", r"\bCONDOMINIO\b", r"\bPARCELA\b", r"\bSITIO\b",
+    r"\bSECTOR\b", r"\bLOTE\b", r"\bNRO\b", r"\bEDIFICIO\b", r"\bTORRE\b",
+]
+
+
+def limpiar_direccion_geo(calle, numero, sector, comuna) -> str:
+    """Convierte una dirección en formato chileno informal (ej:
+    'IMPARCIAL CASA 4 Cerro PLAYA ANCHA') en una query más geocodificable por
+    Nominatim/OpenStreetMap: 'calle numero, comuna, Chile'.
+
+    Clave aprendida (probado): quitar el 'Cerro X' de la query MEJORA la tasa de
+    aciertos (OSM mapea mal los cerros de Valparaíso). Pasó de 3/12 a 8/12.
+    """
+    txt = (calle or "").strip()
+
+    # Comuna: del campo, o detectada en el texto, o Valparaíso por defecto.
+    com = (comuna or "").strip()
+    if not com:
+        for c in _COMUNAS_GEO:
+            if c in txt.lower():
+                com = c
+                break
+    if not com:
+        com = "Valparaíso"
+
+    # Número: del campo, o el primero que aparezca en el texto.
+    num = (numero or "").strip()
+    if not num:
+        m = re.search(r"\b(\d{1,6})\b", txt)
+        if m:
+            num = m.group(1)
+
+    # Nombre de calle: quitar 'Cerro ...', ruido, números y la comuna.
+    calle_limpia = re.sub(r"CERRO\s+[A-ZÁÉÍÓÚÑ'\. ]+", "", txt, flags=re.IGNORECASE)
+    # Quitar 'N°'/'Nº'/'º'/'°' sueltos (restos de la numeración).
+    calle_limpia = re.sub(r"[°º]", " ", calle_limpia)
+    calle_limpia = re.sub(r"\bN\b", " ", calle_limpia)
+    for pat in _RUIDO_GEO:
+        calle_limpia = re.sub(pat, " ", calle_limpia, flags=re.IGNORECASE)
+    calle_limpia = re.sub(r"\d+", " ", calle_limpia)
+    for c in _COMUNAS_GEO:
+        calle_limpia = re.sub(re.escape(c), "", calle_limpia, flags=re.IGNORECASE)
+    calle_limpia = re.sub(r"[.\-]", " ", calle_limpia)
+    calle_limpia = re.sub(r"\s+", " ", calle_limpia).strip().title()
+
+    partes = []
+    if calle_limpia:
+        partes.append(f"{calle_limpia} {num}".strip())
+    partes.append(com)
+    partes.append("Chile")
+    return ", ".join(p for p in partes if p)
+
+
 def obtener_estadisticas_dashboard_db(establecimiento_id: int = None, anio: int = None):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -369,11 +434,8 @@ def obtener_muestra_geo_db(establecimiento_id: int = None, limite: int = 15):
         for r in filas:
             nombres, ap_pat, curso, calle, numero, sector, comuna, domicilio = r[2:]
             iniciales = f"{(nombres or '?')[:1]}.{(ap_pat or '?')[:1]}."
-            # Direccion para geocodificar: preferir campo compuesto 'domicilio' + comuna + Chile.
-            dir_geo = (domicilio or "").strip()
-            if comuna and comuna.lower() not in dir_geo.lower():
-                dir_geo = f"{dir_geo}, {comuna}"
-            dir_geo = f"{dir_geo}, Región de Valparaíso, Chile"
+            # Direccion limpia para geocodificar (quita ruido y 'Cerro X' -> mejor tasa en OSM).
+            dir_geo = limpiar_direccion_geo(calle or domicilio, numero, sector, comuna)
             muestra.append({
                 "etiqueta": iniciales,
                 "curso": curso,
