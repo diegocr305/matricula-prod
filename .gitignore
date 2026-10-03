@@ -27,6 +27,19 @@ carga_apoderado/*.xls
 csv pruebas/*.xlsx
 csv pruebas/*.xls
 
+# Datos personales de alumnos (NO subir a git — privacidad de menores)
+# CSV de pruebas, análisis de asistencia y salidas con nombres/RUT reales.
+csv pruebas/*.csv
+csv pruebas/**/*.csv
+csv pruebas/asistencia/salida/
+backend/produccion/salida/
+# Documentos de gestión con datos personales (nombres/RUT de alumnos)
+backend/produccion/ESCUELAS_A_CONTACTAR.md
+# Respaldos de la base (pueden contener datos personales)
+*.sql
+matriculas_backup_*/
+backend/produccion/matriculas_backup_*
+
 # IDEs y editores
 .vscode/
 .idea/

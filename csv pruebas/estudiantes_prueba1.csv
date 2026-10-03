@@ -1,6 +1,0 @@
-run_estudiante,nombres,ap_paterno,ap_materno,fecha_nacimiento,sexo,domicilio,run_apoderado,nombres_apoderado,ap_paterno_apoderado,ap_materno_apoderado,telefono,correo
-24123456-1,Lucas Andres,Gonzalez,Soto,2010-05-14,Masculino,Avenida Alvarez 1500 Viña del Mar,15123456-2,Maria Teresa,Soto,Perez,+56912345678,maria.soto@email.com
-24234567-2,Martina,Rojas,Silva,2011-08-22,Femenino,Calle Valparaiso 450 Viña del Mar,12345678-9,Carlos,Rojas,Mendez,+56987654321,crojas@email.com
-24345678-3,Diego,Muñoz,Cortes,2009-11-03,Masculino,Cerro Concepcion 120 Valparaiso,14555666-K,Ana,Cortes,Tapia,+56955556666,ana.cortes@email.com
-24456789-4,Sofia,Herrera,Vega,2012-02-28,Femenino,Calle Quillota 890 Viña del Mar,13444555-7,Luis,Herrera,Guzman,+56944445555,luis.h@email.com
-24567890-K,Matias,Perez,Lagos,2010-09-15,Masculino,Avenida Errazuriz 300 Valparaiso,16222333-1,Claudia,Lagos,Rios,+56922223333,claudia.lagos@email.com
