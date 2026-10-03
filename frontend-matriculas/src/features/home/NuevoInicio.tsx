@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FolderOpen, Users, Activity, PieChart, ArrowRight } from 'lucide-react';
+import { FolderOpen, Users, Activity, PieChart, CalendarCheck, ArrowRight } from 'lucide-react';
 import { useInicio } from './hooks/useInicio';
 
 export default function Inicio() {
@@ -24,8 +24,8 @@ export default function Inicio() {
         </div>
       </div>
 
-      {/* 🌟 GRID DINÁMICO: 4 columnas si es admin, 3 columnas si es colegio */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${puedeVerAuditoria ? 'lg:grid-cols-4' : 'lg:grid-cols-3 max-w-5xl mx-auto'}`}>
+      {/* 🌟 GRID DINÁMICO: 5 columnas si es admin, 4 columnas si es colegio */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${puedeVerAuditoria ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
 
         {/* 1. BOTÓN MATRÍCULAS */}
         <Link to="/matriculas" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-900 hover:shadow-lg transition-all flex flex-col overflow-hidden">
@@ -78,7 +78,24 @@ export default function Inicio() {
           </div>
         </Link>
 
-        {/* 4. BOTÓN AUDITORÍA (Oculto para colegios, visible para admin) */}
+        {/* 4. BOTÓN ASISTENCIA */}
+        <Link to="/asistencia" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-700 hover:shadow-lg transition-all flex flex-col overflow-hidden">
+          <div className="p-5 flex-1">
+            <div className="w-11 h-11 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <CalendarCheck size={24} />
+            </div>
+            <h2 className="text-base font-bold text-gray-800 mb-2">Panel de Asistencia</h2>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Monitoree la asistencia mensual, el semáforo de riesgo escolar, la evolución por mes y el ranking de establecimientos.
+            </p>
+          </div>
+          <div className="bg-gray-50 p-4 border-t border-gray-100 flex justify-between items-center text-blue-700 font-bold text-sm group-hover:bg-blue-700 group-hover:text-white transition-colors">
+            <span>Ver Asistencia</span>
+            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
+
+        {/* 5. BOTÓN AUDITORÍA (Oculto para colegios, visible para admin) */}
         {puedeVerAuditoria && (
           <Link to="/auditoria" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-orange-600 hover:shadow-lg transition-all flex flex-col overflow-hidden">
             <div className="p-5 flex-1">
