@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { Home, FolderOpen, Users, LogOut, Activity, PieChart} from 'lucide-react';
+import { Home, FolderOpen, Users, LogOut, Activity, PieChart, CalendarCheck} from 'lucide-react';
 import { useLayout } from './hooks/useLayout';
 import Footer from './Footer';
 
@@ -55,6 +55,10 @@ export default function Layout() {
             </Link>
              <Link to="/inicio" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/inicio') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
               <PieChart size={18} /> Panel de Control
+            </Link>
+
+            <Link to="/asistencia" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/asistencia') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
+              <CalendarCheck size={18} /> Asistencia
             </Link>
 
             {puedeVerAuditoria && (

@@ -10,6 +10,7 @@ import ConfirmarRenovacion from '../features/matriculas/ConfirmarRenovacion';
 import CuestionarioRetiro from '../features/matriculas/CuestionarioRetiro';
 import Verificador from '../features/documentos/Verificador';
 import Auditoria from '../features/auditoria/Auditoria';
+import PanelAsistencia from '../features/asistencia/PanelAsistencia';
 import Layout from '../components/Layout';
 import EncuestaCambioCurso from '../features/matriculas/CuestionarioCambio';
 import PortalFirmaApoderado from '../features/matriculas/PortalFirmaAPoderado';
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="matriculas/nueva" element={<NuevaMatricula />} />
           <Route path="matriculas/confirmar-renovacion/:idMatricula" element={<ConfirmarRenovacion />} />
           <Route path="estudiantes" element={<Estudiantes />} />
+          <Route path="asistencia" element={<PanelAsistencia />} />
           <Route path="auditoria" element={<Auditoria />} />
           
         </Route>

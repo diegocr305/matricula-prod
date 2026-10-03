@@ -24,6 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from psycopg2.extras import execute_values
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from database import get_db_connection, close_db_pool
@@ -115,30 +116,47 @@ def main():
         sys.stdout.flush()
         return
 
-    # UPSERT por la llave única (id_estudiante, anio, mes, establecimiento)
+    # Para una carga limpia e idempotente: vaciar el año que se recarga y re-insertar
+    # por lotes con execute_values (mucho más rápido que executemany sobre el pooler).
+    anios = sorted({f[4] for f in a_cargar})
     sql = """
         INSERT INTO matriculas.asistencia_mensual
           (id_estudiante, run_ipe, id_establecimiento, rbd, anio_academico, mes_codigo,
            mes_glosa, pct_asist, rango_asistencia, glosa_asistencia, segmento, nivel,
            curso, cod_ensenanza, pie)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (id_estudiante, anio_academico, mes_codigo, id_establecimiento)
-        DO UPDATE SET
-          pct_asist=EXCLUDED.pct_asist, rango_asistencia=EXCLUDED.rango_asistencia,
-          glosa_asistencia=EXCLUDED.glosa_asistencia, segmento=EXCLUDED.segmento,
-          nivel=EXCLUDED.nivel, curso=EXCLUDED.curso, pie=EXCLUDED.pie,
-          fecha_carga=now();
+        VALUES %s
     """
+    # Cerramos la conexión del pool (ya no la usamos) y abrimos una DEDICADA
+    # para la carga masiva, con autocommit controlado por lote.
+    cur.close(); conn.close(); close_db_pool()
+
+    import psycopg2
+    import config as _cfg
+    wconn = psycopg2.connect(_cfg.DATABASE_URL)
+    wconn.cursor().execute("SET search_path TO matriculas, public")
+    wcur = wconn.cursor()
     try:
-        cur.executemany(sql, a_cargar)
-        conn.commit()
-        print(f"\n>>> CARGA APLICADA: {len(a_cargar):,} filas (insert/update). <<<")
+        wcur.execute("DELETE FROM matriculas.asistencia_mensual WHERE anio_academico = ANY(%s)",
+                     (anios,))
+        wconn.commit()
+        print(f"  (limpieza previa del/los año(s) {anios}: {wcur.rowcount:,} filas)")
+        sys.stdout.flush()
+        total = 0
+        LOTE = 5000
+        for i in range(0, len(a_cargar), LOTE):
+            chunk = a_cargar[i:i + LOTE]
+            execute_values(wcur, sql, chunk, page_size=LOTE)
+            wconn.commit()
+            total += len(chunk)
+            print(f"  cargadas {total:,}/{len(a_cargar):,}...")
+            sys.stdout.flush()
+        print(f"\n>>> CARGA APLICADA: {total:,} filas. <<<")
     except Exception as e:
-        conn.rollback()
-        print(f"\nERROR: se revirtió todo. Detalle: {e}")
+        wconn.rollback()
+        print(f"\nERROR durante la carga. Detalle: {e}")
         sys.exit(1)
     finally:
-        cur.close(); conn.close(); close_db_pool()
+        wcur.close(); wconn.close()
     sys.stdout.flush()
 
 

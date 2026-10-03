@@ -74,6 +74,23 @@ Resultado 2026 (segmento escolar, 14.563 alumnos): asistencia prom 83,1%;
   (ver steering 11), para que entre completa. Hoy ambos scripts están listos y
   probados en DRY-RUN; falta aplicar.
 
+## 5ter. Pestaña de Asistencia (IMPLEMENTADA, en producción de datos)
+- **Tabla cargada**: `matriculas.asistencia_mensual` creada y con 88.787 filas 2026
+  (escolar 80.115 / 14.109 alumnos; excluido 6.522; vtf 2.150). Autorizado por el dueño.
+- **Backend**: `routers/asistencia.py` (`/asistencia/resumen`, `/asistencia/anios`) +
+  `services/asistencia_service.py`. Entrega SOLO agregados (KPIs, semáforo por reglas,
+  tendencia mensual, ranking por establecimiento), sin datos personales. Filtra
+  segmento='escolar'; rol Colegio ve solo su establecimiento. Registrado en main.py.
+- **Frontend**: `features/asistencia/PanelAsistencia.tsx` + `hooks/usePanelAsistencia.ts`.
+  Ruta `/asistencia`, enlace "Asistencia" (icono CalendarCheck) en el menú del Layout.
+  Build verificado OK. Diseño macro; preparado para drill-down a micro en el futuro.
+- **Valores reales 2026**: asistencia prom 82,3%; rojo 2.616, amarillo 3.848,
+  verde 7.625, revisar 20; tendencia mar 85% -> jul 75% -> ago 86%.
+- Pendiente de **deploy** (git push prod main + build en servidor, ver steering 04).
+- NOTA privacidad: la vista es agregada (sin nombres). El drill-down a lista nominal
+  de alumnos en riesgo (dato sensible de menores) queda para una fase posterior con
+  control de acceso definido.
+
 ## 6. Pendientes antes de producción (resumen)
 - Privacidad: la lista de prioridad identifica ~6.700 menores en riesgo. Definir
   quién la ve (alinear con perfiles del steering 02) y validar uso con el área

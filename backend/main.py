@@ -7,7 +7,7 @@ from database import get_db_pool, close_db_pool
 
 # Importamos los enrutadores que acabamos de crear
 from routers import auth, dashboard, estudiantes, matriculas, reportes, documentos
-from routers import establecimientos
+from routers import establecimientos, asistencia
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,6 +35,7 @@ app.include_router(dashboard.router)
 app.include_router(establecimientos.router)
 app.include_router(reportes.router)
 app.include_router(documentos.router)
+app.include_router(asistencia.router)
 
 @app.get("/")
 def estado_servidor():
