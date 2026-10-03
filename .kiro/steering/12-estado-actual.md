@@ -75,6 +75,44 @@ dedicada + lotes). Re-ejecutar tras cargar los 861 para subir cobertura a ~100%.
 
 ---
 
+## FRENTE 3 — Visibilidad por rol / permisos granulares · VISIÓN A FUTURO
+
+Estado: NO implementado. Documentado como dirección a seguir (decisión del dueño y
+del director). Conecta con steering 02 (roles/auth) y steering 08 (rol Docente_Jefe).
+
+Idea central: cada **pestaña/panel** del sistema (Matrículas, Estudiantes, Panel de
+Control, **Asistencia**, Trazabilidad) será **habilitable por rol**, y cada director
+de establecimiento define qué ve su gente y SIEMPRE acotado a los datos de SU
+establecimiento. Hoy la visibilidad es gruesa (SLEP ve todo; Colegio ve lo suyo);
+la meta es un control más fino, pestaña por pestaña.
+
+### Casos definidos
+- **Director de establecimiento**: puede ver todo lo de su colegio, o configurarse
+  para ver solo ciertos paneles/dashboards. El director decide. Sus datos = su RBD.
+- **Profesor jefe** (rol nuevo `Docente_Jefe`, ver steering 08): el director le da la
+  **responsabilidad de pre-matricular a su curso**. Ese profesor SOLO verá:
+  - La pestaña **Estudiantes** acotada a su curso.
+  - La pestaña **Matrículas** acotada a su curso (para pre-matricular/renovar).
+  - NO ve Panel de Control, Asistencia global, ni otros cursos.
+- La **habilitación es por solicitud a cada director** (no automática): el director
+  pide/activa los accesos de sus profesores jefes.
+
+### Implicancias técnicas (cuando se implemente)
+- Requiere `id_curso` en `acceso_establecimiento` (hoy solo `id_establecimiento`),
+  tal como anota steering 08.
+- Requiere un mapa de "qué rol ve qué pestaña" tanto en el frontend (menú del Layout
+  y tarjetas del Home) como en el backend (guards por endpoint).
+- La pestaña **Asistencia** entra en este esquema: el director decide si la ve; el
+  profesor jefe NO la ve (o solo su curso, a definir).
+
+### Nota de UI pendiente (menor)
+La pestaña **Asistencia** ya está en el menú superior del Layout, pero **falta
+agregar su tarjeta en el Home** (`features/home/NuevoInicio.tsx`), donde hoy solo
+están Matrículas, Estudiantes, Panel de Control y Trazabilidad. Pendiente cosmético,
+a hacer cuando se decida que el rol correspondiente debe verla desde el Home.
+
+---
+
 ## Mapa de documentos (para orientarse)
 - `.kiro/steering/01`–`09`: arquitectura, auth, operación, servidor, firma, caso borde,
   visión/roadmap, post-reunión DEE, versionado/UI.
