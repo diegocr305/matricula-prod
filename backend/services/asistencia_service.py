@@ -123,6 +123,20 @@ def obtener_resumen_asistencia_db(establecimiento_id=None, anio=None):
         """, {"anio": anio})
         sin_asistencia = cur.fetchone()[0] or 0
 
+        # --- Variación del último mes vs el mes anterior (puntos porcentuales) ---
+        variacion = None  # None si no hay al menos 2 meses
+        if len(tendencia) >= 2:
+            ult = tendencia[-1]
+            prev = tendencia[-2]
+            variacion = {
+                "mes_actual": ult["glosa"],
+                "mes_anterior": prev["glosa"],
+                "pct_actual": ult["pct"],
+                "pct_anterior": prev["pct"],
+                # diferencia en puntos porcentuales (ej. +2.3 o -3.1)
+                "delta_pp": round((ult["pct"] - prev["pct"]) * 100, 1),
+            }
+
         return {
             "anio": anio,
             "umbral": UMBRAL_INSUF,
@@ -133,6 +147,7 @@ def obtener_resumen_asistencia_db(establecimiento_id=None, anio=None):
             },
             "semaforo": semaforo,
             "tendencia": tendencia,
+            "variacion": variacion,
             "ranking": ranking,
         }
     except Exception as e:

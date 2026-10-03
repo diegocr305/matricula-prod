@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import {
   CalendarCheck, AlertTriangle, TrendingDown, TrendingUp, Users, School,
+  ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -97,7 +98,11 @@ export default function PanelAsistencia() {
         <div className="bg-white p-5 rounded-r-lg shadow-sm border border-gray-200 border-l-4 border-l-blue-900">
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Asistencia promedio</p>
           <p className="text-3xl font-black text-blue-950">{pct(data.kpis.pct_promedio)}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">Escolar · umbral {pct(data.umbral)}</p>
+          {data.variacion ? (
+            <VariacionTendencia v={data.variacion} />
+          ) : (
+            <p className="text-[10px] text-gray-400 mt-0.5">Escolar · umbral {pct(data.umbral)}</p>
+          )}
         </div>
         <div className="bg-white p-5 rounded-r-lg shadow-sm border border-gray-200 border-l-4 border-l-red-600">
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">En riesgo (rojo)</p>
@@ -200,6 +205,23 @@ function BarraSemaforo({ label, valor, total, color, texto }:
       <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${p}%` }} />
       </div>
+    </div>
+  );
+}
+
+function VariacionTendencia({ v }: {
+  v: { mes_actual: string; mes_anterior: string; delta_pp: number };
+}) {
+  const sube = v.delta_pp > 0.05;
+  const baja = v.delta_pp < -0.05;
+  const Icono = sube ? ArrowUpRight : baja ? ArrowDownRight : Minus;
+  const color = sube ? 'text-emerald-600' : baja ? 'text-red-600' : 'text-gray-400';
+  const signo = v.delta_pp > 0 ? '+' : '';
+  return (
+    <div className={`flex items-center gap-1 mt-0.5 text-xs font-bold ${color}`} title={`${v.mes_actual} vs ${v.mes_anterior}`}>
+      <Icono size={14} />
+      <span>{signo}{v.delta_pp.toFixed(1)} pp</span>
+      <span className="text-gray-400 font-medium">vs {v.mes_anterior}</span>
     </div>
   );
 }

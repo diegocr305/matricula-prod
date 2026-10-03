@@ -8,6 +8,10 @@ export interface ResumenAsistencia {
   kpis: { alumnos: number; pct_promedio: number; por_validar: number };
   semaforo: { revisar: number; rojo: number; amarillo: number; verde: number };
   tendencia: { mes: number; glosa: string; pct: number }[];
+  variacion: {
+    mes_actual: string; mes_anterior: string;
+    pct_actual: number; pct_anterior: number; delta_pp: number;
+  } | null;
   ranking: { id_establecimiento: number; nombre: string; alumnos: number; pct: number }[];
 }
 
@@ -15,7 +19,7 @@ const VACIO: ResumenAsistencia = {
   anio: 0, umbral: 0.85,
   kpis: { alumnos: 0, pct_promedio: 0, por_validar: 0 },
   semaforo: { revisar: 0, rojo: 0, amarillo: 0, verde: 0 },
-  tendencia: [], ranking: [],
+  tendencia: [], variacion: null, ranking: [],
 };
 
 export const usePanelAsistencia = () => {
