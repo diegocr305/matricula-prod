@@ -26,11 +26,12 @@ export default function PanelAsistencia() {
     [data],
   );
 
-  const fmtItem = (r: { nombre: string; pct: number }) => {
+  const fmtItem = (r: { nombre: string; pct: number; delta_pp: number | null }) => {
     const limpio = r.nombre.replace(/\s*\(\d+\)\s*$/, '').trim();
     return {
-      nombre: limpio.length > 38 ? `${limpio.slice(0, 37)}…` : limpio,
+      nombre: limpio.length > 40 ? `${limpio.slice(0, 39)}…` : limpio,
       pct: +(r.pct * 100).toFixed(1),
+      delta: r.delta_pp,
     };
   };
 
@@ -227,29 +228,46 @@ function VariacionTendencia({ v }: {
 }
 
 function RankingBar({ titulo, icono, datos }:
-  { titulo: string; icono: ReactNode; datos: { nombre: string; pct: number }[] }) {
+  { titulo: string; icono: ReactNode;
+    datos: { nombre: string; pct: number; delta: number | null }[] }) {
+  const colorBarra = (p: number) => (p < 70 ? '#DC2626' : p < 85 ? '#F59E0B' : '#059669');
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
       <h3 className="text-lg font-extrabold text-gray-800 uppercase tracking-wide border-b border-gray-200 pb-3 mb-4 flex items-center gap-2">
         {icono} {titulo}
       </h3>
-      <ResponsiveContainer width="100%" height={Math.max(320, datos.length * 46)}>
-        <BarChart data={datos} layout="vertical" margin={{ top: 5, right: 48, left: 10, bottom: 5 }} barCategoryGap="25%">
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-          <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: '#6B7280', fontSize: 12 }} />
-          <YAxis type="category" dataKey="nombre" width={260} interval={0}
-            tick={{ fill: '#1f2937', fontSize: 12, fontWeight: 600 }} />
-          <Tooltip formatter={(v) => [`${v}%`, 'Asistencia']} cursor={{ fill: '#F9FAFB' }}
-            contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-          <Bar dataKey="pct" radius={[0, 4, 4, 0]} barSize={22}>
-            {datos.map((e, i) => (
-              <Cell key={i} fill={e.pct < 70 ? '#DC2626' : e.pct < 85 ? '#F59E0B' : '#059669'} />
-            ))}
-            <LabelList dataKey="pct" position="right" formatter={(v: any) => `${v}%`}
-              style={{ fill: '#374151', fontSize: 12, fontWeight: 700 }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="space-y-2.5">
+        {datos.map((e, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <span className="w-[46%] text-xs font-semibold text-gray-800 truncate" title={e.nombre}>
+              {e.nombre}
+            </span>
+            <div className="flex-1 h-5 bg-gray-100 rounded-md overflow-hidden">
+              <div className="h-full rounded-md transition-all"
+                style={{ width: `${e.pct}%`, backgroundColor: colorBarra(e.pct) }} />
+            </div>
+            <span className="w-11 text-right text-xs font-black text-gray-700 shrink-0">{e.pct}%</span>
+            <span className="w-14 shrink-0"><FlechaDelta delta={e.delta} /></span>
+          </div>
+        ))}
+      </div>
     </div>
+  );
+}
+
+function FlechaDelta({ delta }: { delta: number | null }) {
+  if (delta === null || delta === undefined) {
+    return <span className="text-[11px] text-gray-300">—</span>;
+  }
+  const sube = delta > 0.05;
+  const baja = delta < -0.05;
+  const Icono = sube ? ArrowUpRight : baja ? ArrowDownRight : Minus;
+  const color = sube ? 'text-emerald-600' : baja ? 'text-red-600' : 'text-gray-400';
+  const signo = delta > 0 ? '+' : '';
+  return (
+    <span className={`flex items-center gap-0.5 text-[11px] font-bold ${color}`}
+      title="Variación último mes vs anterior">
+      <Icono size={13} />{signo}{delta.toFixed(1)}
+    </span>
   );
 }

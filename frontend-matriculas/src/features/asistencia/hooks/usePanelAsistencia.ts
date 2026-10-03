@@ -12,7 +12,10 @@ export interface ResumenAsistencia {
     mes_actual: string; mes_anterior: string;
     pct_actual: number; pct_anterior: number; delta_pp: number;
   } | null;
-  ranking: { id_establecimiento: number; nombre: string; alumnos: number; pct: number }[];
+  ranking: {
+    id_establecimiento: number; nombre: string; alumnos: number;
+    pct: number; delta_pp: number | null;
+  }[];
 }
 
 const VACIO: ResumenAsistencia = {

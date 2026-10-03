@@ -93,22 +93,37 @@ def obtener_resumen_asistencia_db(establecimiento_id=None, anio=None):
         """, params)
         tendencia = [{"mes": mc, "glosa": mg, "pct": float(p)} for mc, mg, p in cur.fetchall()]
 
+        # Últimos dos meses disponibles (para la tendencia por colegio)
+        meses_ord = [t["mes"] for t in tendencia]
+        mes_ult = meses_ord[-1] if meses_ord else None
+        mes_prev = meses_ord[-2] if len(meses_ord) >= 2 else None
+
         # --- Ranking por establecimiento (solo vista SLEP; Colegio ya viene filtrado) ---
+        # Incluye el promedio general del año + el delta del último mes vs el anterior
+        # (tendencia por colegio) para mostrar una flecha ↑/↓ en cada barra.
         ranking = []
         if not establecimiento_id:
             cur.execute(f"""
                 SELECT am.id_establecimiento, e.nombre,
                        COUNT(DISTINCT am.id_estudiante) AS alumnos,
-                       ROUND(AVG(am.pct_asist)::numeric, 4) AS prom
+                       ROUND(AVG(am.pct_asist)::numeric, 4) AS prom,
+                       ROUND(AVG(am.pct_asist) FILTER (WHERE am.mes_codigo = %(m_ult)s)::numeric, 4)  AS prom_ult,
+                       ROUND(AVG(am.pct_asist) FILTER (WHERE am.mes_codigo = %(m_prev)s)::numeric, 4) AS prom_prev
                 FROM matriculas.asistencia_mensual am
                 JOIN matriculas.establecimiento e ON e.id_establecimiento = am.id_establecimiento
                 WHERE am.anio_academico = %(anio)s AND am.segmento = %(seg)s
                 GROUP BY am.id_establecimiento, e.nombre
                 ORDER BY prom ASC
-            """, params)
-            ranking = [{"id_establecimiento": idd, "nombre": nom,
-                        "alumnos": al, "pct": float(p)}
-                       for idd, nom, al, p in cur.fetchall()]
+            """, {**params, "m_ult": mes_ult, "m_prev": mes_prev})
+            for idd, nom, al, p, p_ult, p_prev in cur.fetchall():
+                delta = None
+                if p_ult is not None and p_prev is not None:
+                    delta = round((float(p_ult) - float(p_prev)) * 100, 1)
+                ranking.append({
+                    "id_establecimiento": idd, "nombre": nom,
+                    "alumnos": al, "pct": float(p),
+                    "delta_pp": delta,  # tendencia del colegio: último mes vs anterior
+                })
 
         # --- Cobertura (los 861 por validar): alumnos escolares con matrícula del año
         #     que NO tienen asistencia cargada todavía ---
