@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
+import type { ReactNode } from 'react';
 import {
-  CalendarCheck, AlertTriangle, TrendingDown, Users, School,
+  CalendarCheck, AlertTriangle, TrendingDown, TrendingUp, Users, School,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -24,14 +25,19 @@ export default function PanelAsistencia() {
     [data],
   );
 
-  const rankingChart = useMemo(
-    () => data.ranking.slice(0, 10).map((r) => {
-      const limpio = r.nombre.replace(/\s*\(\d+\)\s*$/, '').trim();
-      return {
-        nombre: limpio.length > 38 ? `${limpio.slice(0, 37)}…` : limpio,
-        pct: +(r.pct * 100).toFixed(1),
-      };
-    }),
+  const fmtItem = (r: { nombre: string; pct: number }) => {
+    const limpio = r.nombre.replace(/\s*\(\d+\)\s*$/, '').trim();
+    return {
+      nombre: limpio.length > 38 ? `${limpio.slice(0, 37)}…` : limpio,
+      pct: +(r.pct * 100).toFixed(1),
+    };
+  };
+
+  // El ranking viene ordenado ascendente (peores primero).
+  const peoresChart = useMemo(() => data.ranking.slice(0, 10).map(fmtItem), [data]);
+  // Mejores: los últimos del ranking, mostrados de mayor a menor.
+  const mejoresChart = useMemo(
+    () => data.ranking.slice(-10).reverse().map(fmtItem),
     [data],
   );
 
@@ -154,37 +160,25 @@ export default function PanelAsistencia() {
         </div>
       </div>
 
-      {/* Ranking por establecimiento (solo vista SLEP) */}
-      {rankingChart.length > 0 && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h3 className="text-lg font-extrabold text-gray-800 uppercase tracking-wide border-b border-gray-200 pb-3 mb-4 flex items-center gap-2">
-            <School size={20} className="text-blue-900" /> Menor asistencia por establecimiento
-          </h3>
-          <ResponsiveContainer width="100%" height={Math.max(320, rankingChart.length * 46)}>
-            <BarChart data={rankingChart} layout="vertical" margin={{ top: 5, right: 48, left: 10, bottom: 5 }} barCategoryGap="25%">
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-              <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: '#6B7280', fontSize: 12 }} />
-              <YAxis
-                type="category"
-                dataKey="nombre"
-                width={260}
-                interval={0}
-                tick={{ fill: '#1f2937', fontSize: 12, fontWeight: 600 }}
-              />
-              <Tooltip formatter={(v) => [`${v}%`, 'Asistencia']} cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Bar dataKey="pct" radius={[0, 4, 4, 0]} barSize={22}>
-                {rankingChart.map((e, i) => (
-                  <Cell key={i} fill={e.pct < 70 ? '#DC2626' : e.pct < 85 ? '#F59E0B' : '#059669'} />
-                ))}
-                <LabelList dataKey="pct" position="right" formatter={(v: any) => `${v}%`}
-                  style={{ fill: '#374151', fontSize: 12, fontWeight: 700 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <p className="text-[11px] text-gray-400 mt-2">
+      {/* Ranking por establecimiento (solo vista SLEP): mejores y peores */}
+      {peoresChart.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+            <RankingBar
+              titulo="Mayor asistencia (destacados)"
+              icono={<TrendingUp size={20} className="text-emerald-700" />}
+              datos={mejoresChart}
+            />
+            <RankingBar
+              titulo="Menor asistencia (a reforzar)"
+              icono={<School size={20} className="text-red-700" />}
+              datos={peoresChart}
+            />
+          </div>
+          <p className="text-[11px] text-gray-400">
             Jardines VTF y modalidad adultos/especial se analizan por separado y no entran a este comparativo.
           </p>
-        </div>
+        </>
       )}
 
       <p className="text-center text-xs text-gray-400 pt-2">
@@ -206,6 +200,34 @@ function BarraSemaforo({ label, valor, total, color, texto }:
       <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${p}%` }} />
       </div>
+    </div>
+  );
+}
+
+function RankingBar({ titulo, icono, datos }:
+  { titulo: string; icono: ReactNode; datos: { nombre: string; pct: number }[] }) {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <h3 className="text-lg font-extrabold text-gray-800 uppercase tracking-wide border-b border-gray-200 pb-3 mb-4 flex items-center gap-2">
+        {icono} {titulo}
+      </h3>
+      <ResponsiveContainer width="100%" height={Math.max(320, datos.length * 46)}>
+        <BarChart data={datos} layout="vertical" margin={{ top: 5, right: 48, left: 10, bottom: 5 }} barCategoryGap="25%">
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+          <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: '#6B7280', fontSize: 12 }} />
+          <YAxis type="category" dataKey="nombre" width={260} interval={0}
+            tick={{ fill: '#1f2937', fontSize: 12, fontWeight: 600 }} />
+          <Tooltip formatter={(v) => [`${v}%`, 'Asistencia']} cursor={{ fill: '#F9FAFB' }}
+            contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+          <Bar dataKey="pct" radius={[0, 4, 4, 0]} barSize={22}>
+            {datos.map((e, i) => (
+              <Cell key={i} fill={e.pct < 70 ? '#DC2626' : e.pct < 85 ? '#F59E0B' : '#059669'} />
+            ))}
+            <LabelList dataKey="pct" position="right" formatter={(v: any) => `${v}%`}
+              style={{ fill: '#374151', fontSize: 12, fontWeight: 700 }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
