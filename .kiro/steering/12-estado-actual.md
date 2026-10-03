@@ -105,11 +105,12 @@ la meta es un control más fino, pestaña por pestaña.
 - La pestaña **Asistencia** entra en este esquema: el director decide si la ve; el
   profesor jefe NO la ve (o solo su curso, a definir).
 
-### Nota de UI pendiente (menor)
-La pestaña **Asistencia** ya está en el menú superior del Layout, pero **falta
-agregar su tarjeta en el Home** (`features/home/NuevoInicio.tsx`), donde hoy solo
-están Matrículas, Estudiantes, Panel de Control y Trazabilidad. Pendiente cosmético,
-a hacer cuando se decida que el rol correspondiente debe verla desde el Home.
+### Nota de UI (hecho)
+La pestaña **Asistencia** está disponible desde DOS lugares: el menú superior del
+Layout y una **tarjeta "Panel de Asistencia" en el Home** (`features/home/NuevoInicio.tsx`,
+agregada; grid ajustado a 5 columnas para admin / 4 para colegio). Hoy la ven todos
+los perfiles; cuando se implemente el control de visibilidad por rol, se condicionará
+igual que la tarjeta de Auditoría (patrón `puedeVerAuditoria`).
 
 ---
 
@@ -130,6 +131,8 @@ a hacer cuando se decida que el rol correspondiente debe verla desde el Home.
 
 ---
 
-## Último estado desplegado (asistencia)
-Commit `8895351` en `prod/main`. Para que el servidor lo refleje, falta que el dueño
-corra el `git pull` + restart backend + build frontend (ver steering 04).
+## Último estado en prod/main (asistencia)
+Último commit relevante: tarjeta de Asistencia en el Home + flechas de tendencia por
+colegio + indicador de variación en KPIs. Todo en `prod/main`. Para que el SERVIDOR lo
+refleje, falta que el dueño corra `git pull origin main` + restart backend
+(si cambió backend) + `npm run build` del frontend + Ctrl+F5 (ver steering 03/04).
