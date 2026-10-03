@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  LineChart, Line,
+  LineChart, Line, LabelList,
 } from 'recharts';
 import { usePanelAsistencia } from './hooks/usePanelAsistencia';
 
@@ -25,10 +25,13 @@ export default function PanelAsistencia() {
   );
 
   const rankingChart = useMemo(
-    () => data.ranking.slice(0, 10).map((r) => ({
-      nombre: r.nombre.replace(/\s*\(\d+\)\s*$/, '').slice(0, 28),
-      pct: +(r.pct * 100).toFixed(1),
-    })),
+    () => data.ranking.slice(0, 10).map((r) => {
+      const limpio = r.nombre.replace(/\s*\(\d+\)\s*$/, '').trim();
+      return {
+        nombre: limpio.length > 38 ? `${limpio.slice(0, 37)}…` : limpio,
+        pct: +(r.pct * 100).toFixed(1),
+      };
+    }),
     [data],
   );
 
@@ -157,16 +160,24 @@ export default function PanelAsistencia() {
           <h3 className="text-lg font-extrabold text-gray-800 uppercase tracking-wide border-b border-gray-200 pb-3 mb-4 flex items-center gap-2">
             <School size={20} className="text-blue-900" /> Menor asistencia por establecimiento
           </h3>
-          <ResponsiveContainer width="100%" height={Math.max(280, rankingChart.length * 34)}>
-            <BarChart data={rankingChart} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+          <ResponsiveContainer width="100%" height={Math.max(320, rankingChart.length * 46)}>
+            <BarChart data={rankingChart} layout="vertical" margin={{ top: 5, right: 48, left: 10, bottom: 5 }} barCategoryGap="25%">
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-              <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: '#6B7280', fontSize: 11 }} />
-              <YAxis type="category" dataKey="nombre" width={200} tick={{ fill: '#374151', fontSize: 11 }} />
-              <Tooltip formatter={(v) => `${v}%`} cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Bar dataKey="pct" radius={[0, 4, 4, 0]}>
+              <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: '#6B7280', fontSize: 12 }} />
+              <YAxis
+                type="category"
+                dataKey="nombre"
+                width={260}
+                interval={0}
+                tick={{ fill: '#1f2937', fontSize: 12, fontWeight: 600 }}
+              />
+              <Tooltip formatter={(v) => [`${v}%`, 'Asistencia']} cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Bar dataKey="pct" radius={[0, 4, 4, 0]} barSize={22}>
                 {rankingChart.map((e, i) => (
                   <Cell key={i} fill={e.pct < 70 ? '#DC2626' : e.pct < 85 ? '#F59E0B' : '#059669'} />
                 ))}
+                <LabelList dataKey="pct" position="right" formatter={(v: any) => `${v}%`}
+                  style={{ fill: '#374151', fontSize: 12, fontWeight: 700 }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
