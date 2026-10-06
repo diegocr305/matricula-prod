@@ -66,8 +66,9 @@ DDL_COLS_MATRICULA = [
 
 # Función que ubica la matrícula por RUT del alumno (normaliza) + año opcional.
 # SECURITY DEFINER: la Edge Function la invoca vía RPC.
-DDL_FUNCION = """
-CREATE OR REPLACE FUNCTION buscar_matricula_por_rut(p_rut text, p_anio integer DEFAULT NULL)
+def obtener_ddl_funcion(schema: str) -> str:
+    return f"""
+CREATE OR REPLACE FUNCTION {schema}.buscar_matricula_por_rut(p_rut text, p_anio integer DEFAULT NULL)
 RETURNS TABLE(
     id_estudiante integer,
     id_apoderado_principal integer,
@@ -79,21 +80,21 @@ RETURNS TABLE(
 )
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path TO 'matriculas'
+SET search_path TO '{schema}'
 AS $function$
   WITH norm AS (
     SELECT upper(regexp_replace(p_rut, '[.\\-\\s]', '', 'g')) AS rut
   ),
   est AS (
     SELECT e.id_estudiante, e.id_apoderado_principal, e.id_apoderado_suplente
-    FROM matriculas.estudiante e, norm
+    FROM {schema}.estudiante e, norm
     WHERE upper(regexp_replace(e.run_ipe, '[.\\-\\s]', '', 'g')) = norm.rut
     LIMIT 1
   )
   SELECT est.id_estudiante, est.id_apoderado_principal, est.id_apoderado_suplente,
          m.id_matricula, m.anio_escolar, m.id_establecimiento, m.estado
   FROM est
-  JOIN matriculas.matricula m ON m.id_estudiante = est.id_estudiante
+  JOIN {schema}.matricula m ON m.id_estudiante = est.id_estudiante
   WHERE (p_anio IS NULL OR m.anio_escolar = p_anio)
   ORDER BY m.anio_escolar DESC
   LIMIT 1;
@@ -120,8 +121,11 @@ def migrate():
             cur.execute(ddl)
         print("Columnas de firma en 'matricula' aseguradas.")
 
-        print("Creando/actualizando función 'buscar_matricula_por_rut'...")
-        cur.execute(DDL_FUNCION)
+        cur.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'matriculas';")
+        schema = 'matriculas' if cur.fetchone() else 'public'
+
+        print(f"Creando/actualizando función '{schema}.buscar_matricula_por_rut'...")
+        cur.execute(obtener_ddl_funcion(schema))
 
         conn.commit()
         print("Migración de firma aplicada exitosamente.")

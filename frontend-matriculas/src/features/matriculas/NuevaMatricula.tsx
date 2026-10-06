@@ -7,8 +7,10 @@ import { ModalFaltantes } from './components/ModalFaltantes';
 import { ModalExito } from './components/ModalExito';
 import { ModalSalida } from './components/ModalSalida';
 import { validarTamanoArchivo } from '../../utils/fileValidation';
+import { useToast } from '../../components/Toast';
 
 export default function NuevaMatricula() {
+  const { toast } = useToast();
   const {
     navigate, cargando, error, matriculaExitosa,
     rutBusqueda, estudiante, setEstudiante,
@@ -24,6 +26,7 @@ export default function NuevaMatricula() {
     handleSubmit, generarComprobantePDF, estudianteCompleto,
     cuposOcupados, limiteCupos,
     archivoResolucion, setArchivoResolucion,
+    archivoTraslado, setArchivoTraslado,
     pasoActual, irSiguientePaso, irPasoAnterior,
     modalSalidaAbierto, confirmarSalida, cancelarSalida,
     // Estados de la regla de 1 año
@@ -468,12 +471,40 @@ export default function NuevaMatricula() {
                   </div>
                 </label>
                 {idEstablecimientoPrevio !== String(formulario.id_establecimiento) && (
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={checkCertRetiro} onChange={(e) => setCheckCertRetiro(e.target.checked)} className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer" />
-                    <div>
-                      <p className="text-sm font-bold text-gray-800 group-hover:text-blue-700">Se presentó el Certificado de Retiro o Traslado</p>
-                    </div>
-                  </label>
+                  <div className="space-y-2 pt-1 border-t border-gray-200">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input type="checkbox" checked={checkCertRetiro} onChange={(e) => setCheckCertRetiro(e.target.checked)} className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer" />
+                      <div>
+                        <p className="text-sm font-bold text-gray-800 group-hover:text-blue-700">Se presentó el Certificado de Retiro o Traslado</p>
+                        <p className="text-xs text-gray-500">Documento que acredita la desvinculación oficial del establecimiento de origen.</p>
+                      </div>
+                    </label>
+
+                    {checkCertRetiro && (
+                      <div className="ml-7 p-3 bg-purple-50 rounded-lg border border-purple-200 space-y-1.5 animate-in slide-in-from-top-1">
+                        <label className="block text-xs font-bold text-purple-900">
+                          📎 Adjuntar Certificado de Retiro o Traslado (PDF o Imagen - Opcional):
+                        </label>
+                        <input
+                          type="file"
+                          accept=".pdf,image/png,image/jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setArchivoTraslado(e.target.files[0]);
+                            } else {
+                              setArchivoTraslado(null);
+                            }
+                          }}
+                          className="text-xs text-gray-700 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                        />
+                        {archivoTraslado && (
+                          <p className="text-xs text-purple-800 font-semibold pt-1">
+                            ✓ Archivo listo: {archivoTraslado.name} ({(archivoTraslado.size / 1024).toFixed(1)} KB)
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -574,7 +605,7 @@ export default function NuevaMatricula() {
               <button 
                 type="button" 
                 onClick={irSiguientePaso}
-                disabled={!checkCertNotas || (idEstablecimientoPrevio !== String(formulario.id_establecimiento) && !checkCertRetiro) || (formulario.es_excedente && !archivoResolucion)} 
+                disabled={!checkCertNotas || (idEstablecimientoPrevio !== String(formulario.id_establecimiento) && !checkCertRetiro) || (formulario.es_excedente && !archivoResolucion) || alertasTransicion.some(a => a.tipo === 'peligro')} 
                 className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50"
               >
                 Siguiente Paso <ChevronRight size={18} />

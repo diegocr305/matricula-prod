@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config/api';
 import { validarListaArchivos } from '../../../utils/fileValidation';
+import { useToast } from '../../../components/Toast';
+import { obtenerRangoCurso } from '../../../utils/gradeHierarchy';
 
 export interface Matricula {
   id_matricula: number;
@@ -26,6 +28,11 @@ export interface Matricula {
   estado_renovacion?: string | null;
   suplente_rut?: string | null;
   suplente_nombre?: string | null;
+  ruta_documento_traslado?: string | null;
+  motivo_retiro?: string | null;
+  fecha_retiro?: string | null;
+  observaciones?: string | null;
+  detalle_retiro_encuesta?: string | null;
 }
 
 export interface PaginatedResponse {
@@ -37,13 +44,24 @@ export interface PaginatedResponse {
 }
 
 export const useMatriculas = () => {
-  const { colegioSeleccionado } = useOutletContext<{ colegioSeleccionado: string }>();
+  const { toast } = useToast();
+  const context = useOutletContext<{ 
+    colegioSeleccionado: string; 
+    setColegioSeleccionado?: (col: string) => void;
+    establecimientos?: any[];
+    esPerfilGlobal?: boolean;
+  }>() || { colegioSeleccionado: '' };
+
+  const colegioSeleccionado = context.colegioSeleccionado || '';
+  const setColegioSeleccionado = context.setColegioSeleccionado;
+  const establecimientos = context.establecimientos || [];
 
   // --- LÓGICA DE ROLES ---
   const usuarioString = localStorage.getItem('usuario');
   const usuario = usuarioString ? JSON.parse(usuarioString) : null;
   const puedeEditar = !['Visualizador_SLEP', 'Visualizador_Colegio'].includes(usuario?.rol);
   const esAdminOSlep = ['admin_slep', 'slep', 'admin'].includes(String(usuario?.rol || '').toLowerCase());
+  const esPerfilGlobal = context.esPerfilGlobal ?? esAdminOSlep;
   const puedeCargarSIGE = esAdminOSlep && puedeEditar;
 
   const [motivoCambio, setMotivoCambio] = useState('');
@@ -75,6 +93,7 @@ export const useMatriculas = () => {
 
   const [filtroCodigo, setFiltroCodigo] = useState('');
   const [filtroCurso, setFiltroCurso] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
   const [ordenFolio, setOrdenFolio] = useState<'asc' | 'desc' | null>('asc');
   const [ordenEstado, setOrdenEstado] = useState<'asc' | 'desc' | null>(null);
 
@@ -94,7 +113,7 @@ export const useMatriculas = () => {
   }, [busqueda]);
 
   // Reset página cuando cambian filtros
-  useEffect(() => { setPage(1); }, [filtroAnio, filtroCodigo, filtroCurso, colegioSeleccionado]);
+  useEffect(() => { setPage(1); }, [filtroAnio, filtroCodigo, filtroCurso, filtroEstado, colegioSeleccionado]);
   useEffect(() => { setFiltroCurso(''); }, [filtroCodigo]);
 
   // --- CARGA PRINCIPAL CON PAGINACIÓN ---
@@ -117,6 +136,7 @@ export const useMatriculas = () => {
     if (filtroAnio) params.set('anio', filtroAnio);
     if (filtroCodigo) params.set('codigo', filtroCodigo);
     if (filtroCurso) params.set('curso', filtroCurso);
+    if (filtroEstado) params.set('estado', filtroEstado);
     if (busquedaDebounced) params.set('busqueda', busquedaDebounced);
 
     const url = `${API_BASE_URL}/matriculas?${params.toString()}`;
@@ -142,39 +162,44 @@ export const useMatriculas = () => {
         setError(err.message);
         setCargando(false);
       });
-  }, [colegioSeleccionado, page, filtroAnio, filtroCodigo, filtroCurso, busquedaDebounced]);
+  }, [colegioSeleccionado, page, filtroAnio, filtroCodigo, filtroCurso, filtroEstado, busquedaDebounced]);
 
   useEffect(() => {
     cargarMatriculas();
   }, [cargarMatriculas]);
 
-  // --- DATOS DEL AÑO ACTUAL (para cupos/estructura colegio) ---
-  // Carga separada: solo matrículas activas del año actual para calcular cupos
-  const [matriculasAnioActual, setMatriculasAnioActual] = useState<Matricula[]>([]);
+  // --- DATOS REALES DE CUPOS POR CURSO (desde endpoint especializado) ---
+  const [cuposPorCurso, setCuposPorCurso] = useState<Record<string, number>>({});
+  const [rbdEstablecimiento, setRbdEstablecimiento] = useState<string>('');
 
-  const cargarMatriculasAnioActual = useCallback(() => {
+  const anioObjetivo = useMemo(() => {
+    if (filtroAnio) return parseInt(filtroAnio);
+    return anioActual;
+  }, [filtroAnio, anioActual]);
+
+  const cargarConteoCursos = useCallback(() => {
     if (!colegioSeleccionado) {
-      setMatriculasAnioActual([]);
+      setCuposPorCurso({});
       return;
     }
     const token = localStorage.getItem('token');
-    const params = new URLSearchParams();
-    params.set('establecimiento_id', colegioSeleccionado);
-    params.set('anio', String(anioActual));
-    params.set('page', '1');
-    params.set('page_size', '2000');
+    const anio = anioObjetivo;
+    const url = `${API_BASE_URL}/matriculas/conteo-cursos?establecimiento_id=${colegioSeleccionado}&anio=${anio}`;
 
-    fetch(`${API_BASE_URL}/matriculas?${params.toString()}`, {
+    fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then((datos: PaginatedResponse) => setMatriculasAnioActual(datos.items))
-      .catch(() => setMatriculasAnioActual([]));
-  }, [colegioSeleccionado, anioActual]);
+      .then((data) => {
+        setCuposPorCurso(data.conteo || {});
+        if (data.rbd) setRbdEstablecimiento(String(data.rbd));
+      })
+      .catch(() => setCuposPorCurso({}));
+  }, [colegioSeleccionado, anioObjetivo]);
 
   useEffect(() => {
-    cargarMatriculasAnioActual();
-  }, [cargarMatriculasAnioActual]);
+    cargarConteoCursos();
+  }, [cargarConteoCursos]);
 
   // --- OPCIONES DE FILTRO DESDE EL SERVIDOR (Años, Planes de Estudio, Cursos) ---
   const [opcionesFiltro, setOpcionesFiltro] = useState<{
@@ -277,7 +302,7 @@ export const useMatriculas = () => {
       });
       return estructura;
     }
-    matriculasAnioActual.forEach(mat => {
+    matriculas.forEach(mat => {
       if (mat.estado === 'Activa' && mat.cod_tipo_ensenanza) {
         const codStr = mat.cod_tipo_ensenanza.toString();
         if (!estructura[codStr]) {
@@ -289,37 +314,29 @@ export const useMatriculas = () => {
       }
     });
     return estructura;
-  }, [opcionesFiltro, matriculasAnioActual]);
+  }, [opcionesFiltro, matriculas]);
 
-  // --- CUPOS POR CURSO (del año actual) ---
-  const cuposPorCurso = useMemo(() => {
-    const conteo: Record<string, number> = {};
-    matriculasAnioActual.forEach(m => {
-      if (m.estado === 'Activa' && m.curso) {
-        conteo[m.curso] = (conteo[m.curso] || 0) + 1;
-      }
-    });
-    return conteo;
-  }, [matriculasAnioActual]);
-
-  // --- MATRICULADOS EN CURSO DESTINO ---
+  // --- MATRICULADOS EN CURSO DESTINO Y MODALES ---
   const [modalCursoAbierto, setModalCursoAbierto] = useState(false);
   const [procesandoCurso, setProcesandoCurso] = useState(false);
   const [planDestino, setPlanDestino] = useState<string>('');
   const [cursoDestino, setCursoDestino] = useState<string>('');
   const [capacidadCursoDestino, setCapacidadCursoDestino] = useState<number>(45);
   const [cargandoCapacidadDestino, setCargandoCapacidadDestino] = useState<boolean>(false);
+  const [estudiantesCursoDestino, setEstudiantesCursoDestino] = useState<Array<{ id_matricula: number; numero_correlativo: number; nombre_completo: string; run: string }>>([]);
+  const [cargandoEstudiantesDestino, setCargandoEstudiantesDestino] = useState<boolean>(false);
 
   const matriculadosCursoDestino = useMemo(() => {
     if (!cursoDestino) return 0;
-    return matriculasAnioActual.filter(m =>
-      m.curso === cursoDestino && m.estado === 'Activa'
-    ).length;
-  }, [matriculasAnioActual, cursoDestino]);
+    return cuposPorCurso[cursoDestino] ?? 0;
+  }, [cuposPorCurso, cursoDestino]);
 
   // --- ESTADO DE MODALES Y ACCIONES ---
   const [modalAbierto, setModalAbierto] = useState(false);
   const [idSeleccionado, setIdSeleccionado] = useState<number | null>(null);
+  const matriculaSeleccionada = useMemo(() => {
+    return matriculas.find(m => m.id_matricula === idSeleccionado) || null;
+  }, [matriculas, idSeleccionado]);
   const [fechaRetiro, setFechaRetiro] = useState('');
   const [procesandoRetiro, setProcesandoRetiro] = useState(false);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
@@ -391,17 +408,17 @@ export const useMatriculas = () => {
 
   useEffect(() => {
     const obtenerCapacidadDestino = async () => {
-      if (!modalCursoAbierto || !cursoDestino || matriculasAnioActual.length === 0) {
+      if (!modalCursoAbierto || !cursoDestino) {
         setCapacidadCursoDestino(45);
         return;
       }
-      const rbdReal = matriculasAnioActual[0]?.rbd;
+      const rbdReal = rbdEstablecimiento || matriculaSeleccionada?.rbd || matriculas[0]?.rbd;
       if (!rbdReal) return;
       const nivelExcel = formatearNivelExcel(cursoDestino);
       const token = localStorage.getItem('token');
       setCargandoCapacidadDestino(true);
       try {
-        const url = `${API_BASE_URL}/establecimientos/capacidad-sala?rbd=${rbdReal}&anio_escolar=${anioActual}&nivel=${nivelExcel}`;
+        const url = `${API_BASE_URL}/establecimientos/capacidad-sala?rbd=${rbdReal}&anio_escolar=${anioObjetivo}&nivel=${nivelExcel}`;
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const data = await res.json();
@@ -416,16 +433,41 @@ export const useMatriculas = () => {
       }
     };
     obtenerCapacidadDestino();
-  }, [modalCursoAbierto, cursoDestino, matriculasAnioActual, anioActual]);
+  }, [modalCursoAbierto, cursoDestino, rbdEstablecimiento, matriculaSeleccionada, matriculas, anioObjetivo]);
 
-  const cursoDestinoLleno = Boolean(cursoDestino && matriculadosCursoDestino >= capacidadCursoDestino);
+  // Cargar estudiantes actualmente matriculados en la sala de destino
+  useEffect(() => {
+    if (!modalCursoAbierto || !cursoDestino || !colegioSeleccionado) {
+      setEstudiantesCursoDestino([]);
+      return;
+    }
+    const token = localStorage.getItem('token');
+    setCargandoEstudiantesDestino(true);
+    const url = `${API_BASE_URL}/matriculas/estudiantes-curso?establecimiento_id=${colegioSeleccionado}&anio=${anioObjetivo}&curso=${encodeURIComponent(cursoDestino)}`;
+    fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => res.ok ? res.json() : [])
+      .then((data) => {
+        setEstudiantesCursoDestino(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setEstudiantesCursoDestino([]))
+      .finally(() => setCargandoEstudiantesDestino(false));
+  }, [modalCursoAbierto, cursoDestino, colegioSeleccionado, anioObjetivo]);
 
-  // --- CUPOS VISIBLES (página actual filtrada por curso) ---
+  const esMismoCurso = Boolean(
+    cursoDestino && cursoActual && cursoDestino.trim().toLowerCase() === cursoActual.trim().toLowerCase()
+  );
+
+  const cursoDestinoLleno = Boolean(cursoDestino && !esMismoCurso && matriculadosCursoDestino >= capacidadCursoDestino);
+
+  // --- CUPOS VISIBLES (conteo real desde la base de datos) ---
   const mostrarCupos = filtroAnio !== '' && filtroCodigo !== '' && filtroCurso !== '';
   const cuposOcupados = useMemo(() => {
     if (!mostrarCupos) return 0;
+    if (filtroCurso && typeof cuposPorCurso[filtroCurso] === 'number') {
+      return cuposPorCurso[filtroCurso];
+    }
     return matriculas.filter(m => m.estado === 'Activa').length;
-  }, [matriculas, mostrarCupos]);
+  }, [cuposPorCurso, filtroCurso, matriculas, mostrarCupos]);
 
   // --- matriculasProcesadas: ordenar los resultados de la página actual ---
   const matriculasProcesadas = useMemo(() => {
@@ -457,7 +499,7 @@ export const useMatriculas = () => {
     // Validar límite máximo de 5 MB por archivo
     const validacion = validarListaArchivos(archivos);
     if (!validacion.valido) {
-      alert(validacion.mensaje);
+      toast.warning(validacion.mensaje || 'Uno o más archivos seleccionados superan el tamaño máximo permitido (5 MB).');
       e.target.value = '';
       return;
     }
@@ -478,12 +520,12 @@ export const useMatriculas = () => {
       });
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.detail || "Error al subir los archivos");
-      alert(datos.mensaje);
+      toast.success(datos.mensaje || 'Carga masiva procesada exitosamente.');
       cargarMatriculas();
-      cargarMatriculasAnioActual();
+      cargarConteoCursos();
       cargarOpcionesFiltro();
     } catch (error: any) {
-      alert("Error: " + error.message);
+      toast.error("Error: " + error.message);
     } finally {
       setSubiendoArchivo(false);
       e.target.value = '';
@@ -519,7 +561,7 @@ export const useMatriculas = () => {
     if (enviarApoderadoRetiro && correoApoderadoRetiro.trim()) destinatarios.push(correoApoderadoRetiro.trim());
 
     if (destinatarios.length === 0) {
-      alert('Por cumplimiento normativo, debe indicar al menos un correo de destino (Director o Apoderado) para enviar el comprobante de retiro.');
+      toast.warning('Por cumplimiento normativo, debe indicar al menos un correo de destino (Director o Apoderado) para enviar el comprobante de retiro.');
       return;
     }
 
@@ -548,11 +590,11 @@ export const useMatriculas = () => {
 
       setModalAbierto(false);
       cargarMatriculas();
-      cargarMatriculasAnioActual();
-      alert('Retiro procesado y comprobante enviado con éxito.');
+      cargarConteoCursos();
+      toast.success('Retiro procesado y comprobante enviado con éxito.');
 
     } catch (err: any) {
-      alert('Error: ' + err.message);
+      toast.error('Error al procesar retiro: ' + err.message);
     } finally {
       setProcesandoRetiro(false);
     }
@@ -575,8 +617,20 @@ export const useMatriculas = () => {
     e.preventDefault();
     if (!idSeleccionado || !planDestino || !cursoDestino) return;
 
+    if (esMismoCurso) {
+      toast.warning(`El estudiante ya pertenece al curso '${cursoDestino}'. Por favor seleccione un curso de destino diferente.`);
+      return;
+    }
+
+    const rankActual = obtenerRangoCurso(cursoActual);
+    const rankDest = obtenerRangoCurso(cursoDestino);
+    if (rankActual > 0 && rankDest > 0 && rankDest < rankActual) {
+      toast.error(`NO ESTÁ PERMITIDO: No se puede trasladar al estudiante a un curso inferior (${cursoDestino}) al que ya cursa actualmente (${cursoActual}).`);
+      return;
+    }
+
     if (cursoDestinoLleno) {
-      alert(`⚠️ NO ES POSIBLE EL TRASLADO:\n\nEl curso '${cursoDestino}' ha alcanzado su capacidad máxima permitida (${matriculadosCursoDestino}/${capacidadCursoDestino} cupos ocupados). Seleccione una sala con vacantes disponibles.`);
+      toast.error(`NO ES POSIBLE EL TRASLADO: El curso '${cursoDestino}' ha alcanzado su capacidad máxima permitida (${matriculadosCursoDestino}/${capacidadCursoDestino} cupos ocupados). Seleccione una sala con vacantes disponibles.`);
       return;
     }
 
@@ -590,7 +644,7 @@ export const useMatriculas = () => {
     if (enviarApoderadoCurso && correoApoderadoCurso.trim()) destinatarios.push(correoApoderadoCurso.trim());
 
     if (destinatarios.length === 0) {
-      alert('Por cumplimiento normativo, debe indicar al menos un correo de destino para enviar el certificado de traslado.');
+      toast.warning('Por cumplimiento normativo, debe indicar al menos un correo de destino para enviar el certificado de traslado.');
       return;
     }
 
@@ -618,11 +672,11 @@ export const useMatriculas = () => {
 
       setModalCursoAbierto(false);
       cargarMatriculas();
-      cargarMatriculasAnioActual();
-      alert('Traslado registrado y certificado enviado con éxito.');
+      cargarConteoCursos();
+      toast.success('Traslado registrado y certificado enviado con éxito.');
 
     } catch (err: any) {
-      alert('Error: ' + err.message);
+      toast.error('Error al cambiar de curso: ' + err.message);
     } finally {
       setProcesandoCurso(false);
     }
@@ -637,25 +691,30 @@ export const useMatriculas = () => {
     }
 
     if (cursoDestino && cursoActual) {
-      const numActualMatch = cursoActual.match(/\d+/);
-      const numDestinoMatch = cursoDestino.match(/\d+/);
+      const rankActual = obtenerRangoCurso(cursoActual);
+      const rankDestino = obtenerRangoCurso(cursoDestino);
 
-      if (numActualMatch && numDestinoMatch) {
-        const numActual = parseInt(numActualMatch[0]);
-        const numDestino = parseInt(numDestinoMatch[0]);
-
-        if (numDestino < numActual) {
-          advertencias.push(`• Está moviendo al alumno a un grado INFERIOR (de ${numActual} a ${numDestino}).`);
-        } else if (numDestino > numActual + 1) {
-          advertencias.push(`• Está saltando múltiples grados hacia ADELANTE (de ${numActual} a ${numDestino}).`);
-        } else if (numDestino === numActual + 1) {
-          advertencias.push(`• Está adelantando al alumno al grado SIGUIENTE (de ${numActual} a ${numDestino}). Normalmente los traslados a mitad de año son en el mismo grado.`);
-        }
+      if (rankActual > 0 && rankDestino > 0 && rankDestino < rankActual) {
+        advertencias.push(`• BLOQUEO NORMATIVO: No está permitido trasladar al estudiante a un curso inferior (de '${cursoActual}' a '${cursoDestino}').`);
       } else {
-        const baseActual = cursoActual.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
-        const baseDestino = cursoDestino.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
-        if (baseActual !== baseDestino) {
-          advertencias.push(`• Está cambiando el nivel del curso de '${cursoActual}' a '${cursoDestino}'.`);
+        const numActualMatch = cursoActual.match(/\d+/);
+        const numDestinoMatch = cursoDestino.match(/\d+/);
+
+        if (numActualMatch && numDestinoMatch) {
+          const numActual = parseInt(numActualMatch[0]);
+          const numDestino = parseInt(numDestinoMatch[0]);
+
+          if (numDestino > numActual + 1) {
+            advertencias.push(`• Está saltando múltiples grados hacia ADELANTE (de ${numActual} a ${numDestino}).`);
+          } else if (numDestino === numActual + 1) {
+            advertencias.push(`• Está adelantando al alumno al grado SIGUIENTE (de ${numActual} a ${numDestino}). Normalmente los traslados a mitad de año son en el mismo grado.`);
+          }
+        } else {
+          const baseActual = cursoActual.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
+          const baseDestino = cursoDestino.replace(/\s*[A-Z]\s*$/i, '').trim().toLowerCase();
+          if (baseActual !== baseDestino) {
+            advertencias.push(`• Está cambiando el nivel del curso de '${cursoActual}' a '${cursoDestino}'.`);
+          }
         }
       }
     }
@@ -697,7 +756,7 @@ export const useMatriculas = () => {
       window.URL.revokeObjectURL(urlBlob);
 
     } catch (err: any) {
-      alert("Hubo un error al descargar el Excel: " + err.message);
+      toast.error("Hubo un error al descargar el Excel: " + err.message);
     } finally {
       setDescargandoExcel(false);
     }
@@ -706,12 +765,14 @@ export const useMatriculas = () => {
   const [modalExcelAbierto, setModalExcelAbierto] = useState(false);
 
   return {
-    colegioSeleccionado, puedeEditar, puedeCargarSIGE, esAdminOSlep, anioActual,
+    colegioSeleccionado, setColegioSeleccionado, establecimientos, esPerfilGlobal,
+    puedeEditar, puedeCargarSIGE, esAdminOSlep, anioActual,
     cargando, error, subiendoArchivo,
     busqueda, setBusqueda,
     filtroAnio, setFiltroAnio,
     filtroCodigo, setFiltroCodigo,
     filtroCurso, setFiltroCurso,
+    filtroEstado, setFiltroEstado,
     ordenEstado, setOrdenEstado,
     modalCursoAbierto, setModalCursoAbierto,
     procesandoCurso,
@@ -729,10 +790,12 @@ export const useMatriculas = () => {
     advertenciaNivel,
     modalEmisionAbierto, setModalEmisionAbierto,
     datosEmision,
+    matriculaSeleccionada,
     aniosUnicos, codigosUnicos, cursosUnicos, estructuraColegio, matriculasProcesadas,
     manejarSubidaCSV, abrirModalEmision, iniciarRetiro, confirmarRetiro, iniciarCambioCurso, confirmarCambioCurso,
     mostrarCupos, cuposOcupados, descargandoExcel, exportarAExcel, capacidadSala,
     capacidadCursoDestino, cargandoCapacidadDestino, matriculadosCursoDestino, cursoDestinoLleno, cuposPorCurso,
+    cursoActual, estudiantesCursoDestino, cargandoEstudiantesDestino, esMismoCurso, rbdEstablecimiento,
     modalExcelAbierto, setModalExcelAbierto,
     // Paginación
     page, setPage, totalPages, total,

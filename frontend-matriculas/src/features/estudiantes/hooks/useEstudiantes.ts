@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config/api';
 import { coincideBusqueda } from '../../../utils/search';
+import { useToast } from '../../../components/Toast';
 
 export interface NuevoEstudianteForm {
   run: string;
@@ -91,18 +92,39 @@ const ESTUDIANTE_INICIAL: NuevoEstudianteForm = {
 };
 
 export const useEstudiantes = () => {
-  const { colegioSeleccionado } = useOutletContext<{ colegioSeleccionado: string }>();
+  const { toast } = useToast();
+  const context = useOutletContext<{ 
+    colegioSeleccionado: string; 
+    setColegioSeleccionado?: (col: string) => void;
+    establecimientos?: any[];
+    esPerfilGlobal?: boolean;
+  }>() || { colegioSeleccionado: '' };
+
+  const colegioSeleccionado = context.colegioSeleccionado || '';
+  const setColegioSeleccionado = context.setColegioSeleccionado;
+  const establecimientos = context.establecimientos || [];
   const navigate = useNavigate();
 
   const usuarioString = localStorage.getItem('usuario');
   const usuario = usuarioString ? JSON.parse(usuarioString) : null;
+  const esPerfilGlobal = context.esPerfilGlobal ?? ['SLEP', 'admin_slep', 'Visualizador_SLEP'].includes(usuario?.rol);
   const puedeEditar = !['Visualizador_SLEP', 'Visualizador_Colegio'].includes(usuario?.rol);
 
+  // Modo Búsqueda Global (Red SLEP sin filtro de colegio)
+  const [busquedaGlobal, setBusquedaGlobal] = useState(false);
+
   const [listaEstudiantes, setListaEstudiantes] = useState<any[]>([]);
-  const [cargandoLista, setCargandoLista] = useState(true);
+  const [cargandoLista, setCargandoLista] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 50;
 
   // Filtros Directorio
   const [textoBusqueda, setTextoBusqueda] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
+  const busquedaDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [filtroAnio, setFiltroAnio] = useState<string>('');
   const anioInicializadoRef = useRef(false);
   const colegioPrevioRef = useRef<string | null>(null);
@@ -116,9 +138,30 @@ export const useEstudiantes = () => {
     }
   }, [colegioSeleccionado]);
 
+  // Debounce para búsqueda en servidor (350ms)
+  useEffect(() => {
+    if (busquedaDebounceRef.current) clearTimeout(busquedaDebounceRef.current);
+    busquedaDebounceRef.current = setTimeout(() => {
+      setBusquedaDebounced(textoBusqueda);
+      setPage(1);
+    }, 350);
+    return () => {
+      if (busquedaDebounceRef.current) clearTimeout(busquedaDebounceRef.current);
+    };
+  }, [textoBusqueda]);
+
   const [filtroCodigo, setFiltroCodigo] = useState<string>('');
   const [filtroCurso, setFiltroCurso] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
+
+  // Reset página al cambiar filtros
+  useEffect(() => {
+    setPage(1);
+  }, [filtroAnio, filtroCodigo, filtroCurso, filtroEstado, colegioSeleccionado, busquedaGlobal]);
+
+  useEffect(() => {
+    setFiltroCurso('');
+  }, [filtroCodigo]);
 
   const [datosEstudiante, setDatosEstudiante] = useState<any>(null);
   const [cargandoFicha, setCargandoFicha] = useState(false);
@@ -138,19 +181,145 @@ export const useEstudiantes = () => {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [datosEdicion, setDatosEdicion] = useState<any>({});
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
-  const [buscandoApoderado, setBuscandoApoderado] = useState(false);
-  const [avisoApoderado, setAvisoApoderado] = useState('');
   
   const [buscandoMapa, setBuscandoMapa] = useState(false);
   const [sugerenciasMapa, setSugerenciasMapa] = useState<any[]>([]);
 
-  const cargarDirectorio = () => {
+  const [buscandoApoderado, setBuscandoApoderado] = useState(false);
+  const [avisoApoderado, setAvisoApoderado] = useState<string | null>(null);
+
+  const buscarApoderadoPorRut = async () => {
+    const rutAp = (datosEdicion.rut_apoderado || '').trim();
+    if (!rutAp) {
+      setAvisoApoderado('Ingrese un RUT para buscar.');
+      return;
+    }
+    setBuscandoApoderado(true);
+    setAvisoApoderado(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/estudiante/apoderado/buscar/${encodeURIComponent(rutAp)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.existe) {
+          setDatosEdicion((prev: any) => ({
+            ...prev,
+            nombres_apoderado: d.nombres_apoderado || prev.nombres_apoderado,
+            apellido_paterno_apoderado: d.apellido_paterno_apoderado || prev.apellido_paterno_apoderado,
+            apellido_materno_apoderado: d.apellido_materno_apoderado || prev.apellido_materno_apoderado,
+            domicilio_apoderado: d.domicilio_apoderado || prev.domicilio_apoderado,
+            telefono_apoderado: d.telefono_apoderado || prev.telefono_apoderado,
+            correo_apoderado: d.correo_apoderado || prev.correo_apoderado,
+          }));
+          setAvisoApoderado('Apoderado encontrado y datos precargados.');
+        } else {
+          setAvisoApoderado('Apoderado no encontrado en la base de datos.');
+        }
+      } else {
+        setAvisoApoderado('No se pudo verificar el apoderado.');
+      }
+    } catch {
+      setAvisoApoderado('Error al conectar con el servidor.');
+    } finally {
+      setBuscandoApoderado(false);
+    }
+  };
+
+  // --- OPCIONES DE FILTRO DESDE EL SERVIDOR (Años, Planes de Estudio, Cursos) ---
+  const [opcionesFiltro, setOpcionesFiltro] = useState<{
+    anios: number[];
+    cursos: string[];
+    planes: { codigo: number; descripcion: string }[];
+    cursos_por_plan: Record<string, string[]>;
+  }>({
+    anios: [],
+    cursos: [],
+    planes: [],
+    cursos_por_plan: {},
+  });
+
+  const cargarOpcionesFiltro = useCallback(() => {
+    const token = localStorage.getItem('token');
+    const param = (!busquedaGlobal && colegioSeleccionado) ? `?establecimiento_id=${colegioSeleccionado}` : '';
+    const url = `${API_BASE_URL}/matriculas/opciones-filtro${param}`;
+
+    fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then((data) => {
+        setOpcionesFiltro(data);
+        if (data.anios && data.anios.length > 0) {
+          const ultimoAnioRegistrado = String(data.anios[0]);
+          if (!anioInicializadoRef.current) {
+            setFiltroAnio(ultimoAnioRegistrado);
+            anioInicializadoRef.current = true;
+          }
+        }
+      })
+      .catch(() => {});
+  }, [colegioSeleccionado, busquedaGlobal]);
+
+  useEffect(() => {
+    cargarOpcionesFiltro();
+  }, [cargarOpcionesFiltro]);
+
+  const aniosUnicos = useMemo(() => (opcionesFiltro.anios || []).map(String), [opcionesFiltro.anios]);
+  const codigosUnicos = useMemo(() => {
+    if (opcionesFiltro.planes && opcionesFiltro.planes.length > 0) {
+      return opcionesFiltro.planes.map(p => String(p.codigo));
+    }
+    return [];
+  }, [opcionesFiltro.planes]);
+  const cursosUnicos = useMemo(() => {
+    if (filtroCodigo && opcionesFiltro.cursos_por_plan && opcionesFiltro.cursos_por_plan[filtroCodigo]) {
+      return opcionesFiltro.cursos_por_plan[filtroCodigo];
+    }
+    return opcionesFiltro.cursos || [];
+  }, [filtroCodigo, opcionesFiltro]);
+  const estadosUnicos = useMemo(() => ['Activa', 'Retirada', 'Pendiente_Traslado', 'Sin Matrícula'], []);
+
+  // --- CARGA DEL DIRECTORIO PAGINADO DESDE EL SERVIDOR ---
+  const cargarDirectorio = useCallback(() => {
+    // Si es administrador global y no ha seleccionado colegio ni activado búsqueda general: no cargar lista
+    if (esPerfilGlobal && !colegioSeleccionado && !busquedaGlobal) {
+      setListaEstudiantes([]);
+      setTotal(0);
+      setTotalPages(1);
+      setCargandoLista(false);
+      return;
+    }
+
+    // Si está en búsqueda general pero no ha escrito al menos 2 caracteres: mantener lista limpia para rendimiento
+    if (busquedaGlobal && (!busquedaDebounced || busquedaDebounced.trim().length < 2)) {
+      setListaEstudiantes([]);
+      setTotal(0);
+      setTotalPages(1);
+      setCargandoLista(false);
+      return;
+    }
+
     setCargandoLista(true);
     const token = localStorage.getItem('token'); 
 
-    const url = colegioSeleccionado 
-      ? `${API_BASE_URL}/estudiante?establecimiento_id=${colegioSeleccionado}`
-      : `${API_BASE_URL}/estudiante`;
+    const params = new URLSearchParams();
+    if (!busquedaGlobal && colegioSeleccionado) {
+      params.set('establecimiento_id', colegioSeleccionado);
+    }
+    if (busquedaGlobal) {
+      params.set('buscar_global', 'true');
+    }
+    params.set('page', String(page));
+    params.set('page_size', String(PAGE_SIZE));
+    if (filtroAnio) params.set('anio', filtroAnio);
+    if (filtroCodigo) params.set('codigo', filtroCodigo);
+    if (filtroCurso) params.set('curso', filtroCurso);
+    if (filtroEstado) params.set('estado', filtroEstado);
+    if (busquedaDebounced.trim()) params.set('q', busquedaDebounced.trim());
+
+    const url = `${API_BASE_URL}/estudiante?${params.toString()}`;
 
     fetch(url, {
       method: 'GET',
@@ -159,88 +328,40 @@ export const useEstudiantes = () => {
         'Authorization': `Bearer ${token}` 
       }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Error al conectar con la API');
+        return res.json();
+      })
       .then(datos => {
-        setListaEstudiantes(Array.isArray(datos) ? datos : []);
+        if (datos && Array.isArray(datos.estudiantes)) {
+          setListaEstudiantes(datos.estudiantes);
+          setTotal(datos.total ?? 0);
+          setTotalPages(datos.total_pages ?? 1);
+        } else if (Array.isArray(datos)) {
+          setListaEstudiantes(datos);
+          setTotal(datos.length);
+          setTotalPages(1);
+        } else {
+          setListaEstudiantes([]);
+          setTotal(0);
+          setTotalPages(1);
+        }
         setCargandoLista(false);
       })
       .catch(err => {
         console.error(err);
+        setListaEstudiantes([]);
+        setTotal(0);
+        setTotalPages(1);
         setCargandoLista(false);
       });
-  };
+  }, [colegioSeleccionado, page, filtroAnio, filtroCodigo, filtroCurso, filtroEstado, busquedaDebounced, busquedaGlobal, esPerfilGlobal]);
 
   useEffect(() => {
     cargarDirectorio();
-  }, [colegioSeleccionado]); 
+  }, [cargarDirectorio]);
 
-  const { estudiantesFiltrados, aniosUnicos, codigosUnicos, cursosUnicos, estadosUnicos } = useMemo(() => {
-    if (!listaEstudiantes || listaEstudiantes.length === 0) {
-      return { estudiantesFiltrados: [], aniosUnicos: [], codigosUnicos: [], cursosUnicos: [], estadosUnicos: [] };
-    }
-
-    const mapaEstudiantes = new Map();
-
-    listaEstudiantes.forEach(est => {
-      const rut = est.run || est.estudiante_rut;
-      if (!rut) return;
-
-      if (!mapaEstudiantes.has(rut)) {
-        mapaEstudiantes.set(rut, est);
-      } else {
-        const existente = mapaEstudiantes.get(rut);
-        const anioNuevo = parseInt(est.anio_escolar || est.anio || 0);
-        const anioViejo = parseInt(existente.anio_escolar || existente.anio || 0);
-
-        if (anioNuevo > anioViejo) {
-          mapaEstudiantes.set(rut, est);
-        } else if (anioNuevo === anioViejo) {
-          const idNuevo = est.id_matricula || est.id || 0;
-          const idViejo = existente.id_matricula || existente.id || 0;
-          if (idNuevo > idViejo) {
-            mapaEstudiantes.set(rut, est);
-          }
-        }
-      }
-    });
-
-    const estudiantesUnicos = Array.from(mapaEstudiantes.values());
-
-    const anios = [...new Set(estudiantesUnicos.map(e => String(e.anio_escolar || e.anio)).filter(a => a && a !== 'undefined'))].sort().reverse();
-    const codigos = [...new Set(estudiantesUnicos.map(e => String(e.cod_tipo_ensenanza)).filter(c => c && c !== 'undefined' && c !== 'null'))].sort();
-    const estados = [...new Set(estudiantesUnicos.map(e => String(e.estado)).filter(e => e && e !== 'undefined'))].sort();
-
-    let cursosParaSelect = estudiantesUnicos;
-    if (filtroCodigo) {
-      cursosParaSelect = estudiantesUnicos.filter(e => String(e.cod_tipo_ensenanza) === filtroCodigo);
-    }
-    const cursos = [...new Set(cursosParaSelect.map(e => e.curso).filter(c => c && c !== 'undefined'))].sort();
-
-    const filtrados = estudiantesUnicos.filter(est => {
-      const matchTexto = coincideBusqueda(
-        textoBusqueda,
-        [est.nombre_completo, est.nombres, est.apellido_paterno, est.apellido_materno],
-        [est.run, est.estudiante_rut]
-      );
-      const matchAnio = filtroAnio === '' || String(est.anio_escolar || est.anio) === filtroAnio;
-      const matchCodigo = filtroCodigo === '' || String(est.cod_tipo_ensenanza) === filtroCodigo;
-      const matchCurso = filtroCurso === '' || est.curso === filtroCurso;
-      const matchEstado = filtroEstado === '' || est.estado === filtroEstado;
-
-      return matchTexto && matchAnio && matchCodigo && matchCurso && matchEstado;
-    });
-
-
-    return { estudiantesFiltrados: filtrados, aniosUnicos: anios, codigosUnicos: codigos, cursosUnicos: cursos, estadosUnicos: estados };
-  }, [listaEstudiantes, textoBusqueda, filtroAnio, filtroCodigo, filtroCurso, filtroEstado]);
-
-  // Cuando se computan los años únicos, seleccionar automáticamente el último año de matrículas registradas
-  useEffect(() => {
-    if (!anioInicializadoRef.current && aniosUnicos && aniosUnicos.length > 0) {
-      setFiltroAnio(String(aniosUnicos[0]));
-      anioInicializadoRef.current = true;
-    }
-  }, [aniosUnicos]);
+  const estudiantesFiltrados = listaEstudiantes;
 
   const verFichaEstudiante = async (rut: string) => {
     setCargandoFicha(true);
@@ -301,13 +422,6 @@ export const useEstudiantes = () => {
 
       // Precargar TODO el formulario de edición con los datos existentes
       setDatosEdicion({
-        calle: datos.personal?.calle
-          || (!datos.personal?.numero && !datos.personal?.sector && !datos.personal?.comuna
-              && datos.personal?.domicilio && datos.personal?.domicilio !== 'Sin registrar'
-              ? datos.personal.domicilio : ''),
-        numero: datos.personal?.numero || '',
-        sector: datos.personal?.sector || '',
-        comuna: datos.personal?.comuna || '',
         domicilio: datos.personal?.domicilio && datos.personal.domicilio !== 'Sin registrar' ? datos.personal.domicilio : '',
         
         // Titular
@@ -351,57 +465,11 @@ export const useEstudiantes = () => {
     }
   };
 
-  const buscarApoderadoPorRut = async () => {
-    const rutApod = (datosEdicion.rut_apoderado || '').trim();
-    setAvisoApoderado('');
-    if (!rutApod) {
-      alert('Ingresa un RUT de apoderado para buscar.');
-      return;
-    }
-    setBuscandoApoderado(true);
-    const token = localStorage.getItem('token');
-    try {
-      const respuesta = await fetch(`${API_BASE_URL}/estudiante/apoderado/buscar/${encodeURIComponent(rutApod)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!respuesta.ok) throw new Error('Error al buscar el apoderado');
-      const data = await respuesta.json();
-
-      if (data.existe) {
-        setDatosEdicion((prev: any) => ({
-          ...prev,
-          rut_apoderado: data.rut_apoderado,
-          nombres_apoderado: data.nombres_apoderado,
-          apellido_paterno_apoderado: data.apellido_paterno_apoderado,
-          apellido_materno_apoderado: data.apellido_materno_apoderado,
-          domicilio_apoderado: data.domicilio_apoderado,
-          telefono_apoderado: data.telefono_apoderado,
-          correo_apoderado: data.correo_apoderado,
-        }));
-        setAvisoApoderado(
-          `✅ Apoderado encontrado: ${data.nombres_apoderado} ${data.apellido_paterno_apoderado}. ` +
-          `Asociado a ${data.n_estudiantes} estudiante(s). Al guardar, este alumno quedará vinculado a él ` +
-          `(sus datos NO se modificarán salvo que los edites explícitamente).`
-        );
-      } else {
-        setAvisoApoderado('ℹ️ No existe un apoderado con ese RUT. Completa los datos para crearlo al guardar.');
-      }
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setBuscandoApoderado(false);
-    }
-  };
-
   const handleGuardarEdicion = async () => {
     setGuardandoEdicion(true);
     const token = localStorage.getItem('token');
     try {
       const payloadEnvio = {
-        calle: datosEdicion.calle || null,
-        numero: datosEdicion.numero || null,
-        sector: datosEdicion.sector || null,
-        comuna: datosEdicion.comuna || null,
         domicilio_estudiante: datosEdicion.domicilio || "Sin registrar",
         
         // Titular
@@ -453,9 +521,9 @@ export const useEstudiantes = () => {
 
       await verFichaEstudiante(datosEstudiante.personal.run);
       setModoEdicion(false);
-      alert("✅ Todos los antecedentes y la ficha médica han sido actualizados exitosamente.");
+      toast.success("Todos los antecedentes y la ficha médica han sido actualizados exitosamente.");
     } catch (err: any) {
-      alert("Error: " + err.message);
+      toast.error("Error al actualizar la ficha: " + err.message);
     } finally {
       setGuardandoEdicion(false);
     }
@@ -463,7 +531,7 @@ export const useEstudiantes = () => {
   
   const buscarSugerencias = async () => {
     if (!nuevoEstudiante.domicilio) {
-      alert("Primero escribe una calle o sector para buscar.");
+      toast.warning("Primero escribe una calle o sector para buscar.");
       return;
     }
     setBuscandoMapa(true);
@@ -475,10 +543,10 @@ export const useEstudiantes = () => {
       if (datos && datos.length > 0) {
         setSugerenciasMapa(datos);
       } else {
-        alert("No se encontraron resultados en Chile. Intenta agregar la comuna, ej: 'Avenida Brasil, Valparaíso'.");
+        toast.info("No se encontraron resultados en Chile. Intenta agregar la comuna, ej: 'Avenida Brasil, Valparaíso'.");
       }
     } catch (error) {
-      alert("Hubo un error al conectar con el mapa.");
+      toast.error("Hubo un error al conectar con el servicio de mapas.");
     } finally {
       setBuscandoMapa(false);
     }
@@ -497,43 +565,43 @@ export const useEstudiantes = () => {
   const irSiguientePasoCrear = () => {
     if (pasoCrear === 1) {
       const esIpe = nuevoEstudiante.run.replace(/[^0-9kK]/g, '').length >= 10;
-      if (!nuevoEstudiante.run.trim()) { alert("Debe ingresar el RUN o IPE del estudiante."); return; }
-      if (!esIpe && !validarRUT(nuevoEstudiante.run)) { alert("El RUT del estudiante no es válido."); return; }
+      if (!nuevoEstudiante.run.trim()) { toast.warning("Debe ingresar el RUN o IPE del estudiante."); return; }
+      if (!esIpe && !validarRUT(nuevoEstudiante.run)) { toast.warning("El RUT del estudiante no es válido."); return; }
       if (esIpe && (!nuevoEstudiante.pais_origen_estudiante || !nuevoEstudiante.doc_extranjero_estudiante)) {
-        alert("Para estudiantes con IPE es obligatorio ingresar País de Origen y Documento Extranjero.");
+        toast.warning("Para estudiantes con IPE es obligatorio ingresar País de Origen y Documento Extranjero.");
         return;
       }
       if (!nuevoEstudiante.nombres.trim() || !nuevoEstudiante.apellido_paterno.trim() || !nuevoEstudiante.fecha_nacimiento) {
-        alert("Por favor complete los nombres, apellidos y fecha de nacimiento del estudiante.");
+        toast.warning("Por favor complete los nombres, apellidos y fecha de nacimiento del estudiante.");
         return;
       }
       if (!nuevoEstudiante.domicilio.trim()) {
-        alert("Debe ingresar el domicilio del estudiante.");
+        toast.warning("Debe ingresar el domicilio del estudiante.");
         return;
       }
       setPasoCrear(2);
     } else if (pasoCrear === 2) {
       const esIpa = nuevoEstudiante.run_apoderado.replace(/[^0-9kK]/g, '').length >= 10;
-      if (!nuevoEstudiante.relacion_estudiante) { alert("Seleccione el parentesco del Apoderado Titular."); return; }
+      if (!nuevoEstudiante.relacion_estudiante) { toast.warning("Seleccione el parentesco del Apoderado Titular."); return; }
       if (nuevoEstudiante.relacion_estudiante === 'Tutor Legal Designado' && !archivoTutor) {
-        alert("Debe adjuntar el documento que acredite la tutoría legal.");
+        toast.warning("Debe adjuntar el documento que acredite la tutoría legal.");
         return;
       }
-      if (!nuevoEstudiante.run_apoderado.trim()) { alert("Debe ingresar el RUT del Apoderado Titular."); return; }
-      if (!esIpa && !validarRUT(nuevoEstudiante.run_apoderado)) { alert("El RUT del Apoderado Titular no es válido."); return; }
+      if (!nuevoEstudiante.run_apoderado.trim()) { toast.warning("Debe ingresar el RUT del Apoderado Titular."); return; }
+      if (!esIpa && !validarRUT(nuevoEstudiante.run_apoderado)) { toast.warning("El RUT del Apoderado Titular no es válido."); return; }
       if (!nuevoEstudiante.nombres_apoderado.trim() || !nuevoEstudiante.apellido_paterno_apoderado.trim()) {
-        alert("Complete el nombre y apellido del apoderado titular.");
+        toast.warning("Complete el nombre y apellido del apoderado titular.");
         return;
       }
       if (!nuevoEstudiante.telefono_apoderado.trim() || !nuevoEstudiante.correo_apoderado.trim()) {
-        alert("El teléfono y correo del apoderado titular son obligatorios.");
+        toast.warning("El teléfono y correo del apoderado titular son obligatorios.");
         return;
       }
       if (nuevoEstudiante.tiene_suplente) {
-        if (!nuevoEstudiante.run_suplente.trim()) { alert("Debe ingresar el RUT del Apoderado Suplente."); return; }
-        if (!validarRUT(nuevoEstudiante.run_suplente)) { alert("El RUT del Apoderado Suplente no es válido."); return; }
+        if (!nuevoEstudiante.run_suplente.trim()) { toast.warning("Debe ingresar el RUT del Apoderado Suplente."); return; }
+        if (!validarRUT(nuevoEstudiante.run_suplente)) { toast.warning("El RUT del Apoderado Suplente no es válido."); return; }
         if (!nuevoEstudiante.nombres_suplente.trim() || !nuevoEstudiante.apellido_paterno_suplente.trim()) {
-          alert("Complete el nombre y apellido del apoderado suplente.");
+          toast.warning("Complete el nombre y apellido del apoderado suplente.");
           return;
         }
       }
@@ -548,7 +616,7 @@ export const useEstudiantes = () => {
   const handleCrearEstudiante = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoEstudiante.cesfam.trim() || !nuevoEstudiante.centro_emergencia.trim()) {
-      alert("Por favor complete el CESFAM y Centro de Emergencias en la Ficha Médica.");
+      toast.warning("Por favor complete el CESFAM y Centro de Emergencias en la Ficha Médica.");
       return;
     }
 
@@ -587,9 +655,10 @@ export const useEstudiantes = () => {
       
       setRutRecienCreado(nuevoEstudiante.run);
       setEstudianteCreadoExito(true);
+      toast.success("Estudiante ingresado exitosamente al registro.");
       cargarDirectorio();
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message || "Error al crear el estudiante.");
     } finally {
       setCreando(false);
     }
@@ -638,7 +707,11 @@ export const useEstudiantes = () => {
     cargandoLista, estudiantesFiltrados,
     verFichaEstudiante,
     datosEdicion, setDatosEdicion,
-    buscarApoderadoPorRut, buscandoApoderado, avisoApoderado, setAvisoApoderado,
+    // Contexto Institucional y Búsqueda Global
+    colegioSeleccionado, setColegioSeleccionado, establecimientos, esPerfilGlobal,
+    busquedaGlobal, setBusquedaGlobal,
+    // Paginación
+    page, setPage, totalPages, total,
     // Asistente Nuevo Estudiante
     vistaCrearEstudiante, setVistaCrearEstudiante,
     pasoCrear, setPasoCrear,
@@ -646,6 +719,7 @@ export const useEstudiantes = () => {
     iniciarCrearEstudiante,
     estudianteCreadoExito, rutRecienCreado, cerrarModalExito, irAMatricular, navegandoAMatricular,
     nuevoEstudiante, setNuevoEstudiante, formatearRUT, handleCrearEstudiante,
-    creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion, archivoTutor, setArchivoTutor
+    creando, buscarSugerencias, buscandoMapa, sugerenciasMapa, seleccionarDireccion, archivoTutor, setArchivoTutor,
+    buscarApoderadoPorRut, buscandoApoderado, avisoApoderado
   };
 };

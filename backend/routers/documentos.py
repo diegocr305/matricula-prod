@@ -49,13 +49,13 @@ def descargar_comprobante_ingreso(rut: str, usuario_actual: dict = Depends(obten
 
 @router.get("/adjunto")
 def obtener_documento_adjunto(
-    tipo: str = Query(..., description="'resolucion' o 'tutor'"),
-    id: str = Query(..., description="id_matricula para resolucion, o rut del estudiante para tutor"),
+    tipo: str = Query(..., description="'resolucion', 'traslado' o 'tutor'"),
+    id: str = Query(..., description="id_matricula para resolucion/traslado, o rut del estudiante para tutor"),
     token: Optional[str] = Query(None),
     usuario_actual: dict = Depends(obtener_usuario_actual)
 ):
     """
-    Obtiene el archivo adjunto (resolución de excedente o decreto de tutoría legal).
+    Obtiene el archivo adjunto (resolución de excedente, certificado de traslado o decreto de tutoría legal).
     - Si el sistema usa S3: Redirige temporalmente a una Presigned URL segura de S3 (HTTP 307).
     - Si el sistema usa Local: Transmite el archivo binario directamente (StreamingResponse).
     """
@@ -65,10 +65,16 @@ def obtener_documento_adjunto(
         except ValueError:
             raise HTTPException(status_code=400, detail="El ID de matrícula debe ser numérico.")
         clave = matricula_service.obtener_ruta_documento_resolucion_db(id_mat, usuario_actual)
+    elif tipo == "traslado":
+        try:
+            id_mat = int(id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="El ID de matrícula debe ser numérico.")
+        clave = matricula_service.obtener_ruta_documento_traslado_db(id_mat, usuario_actual)
     elif tipo == "tutor":
         clave = estudiante_service.obtener_ruta_documento_tutor_db(id, usuario_actual)
     else:
-        raise HTTPException(status_code=400, detail="Tipo de documento no válido. Use 'resolucion' o 'tutor'.")
+        raise HTTPException(status_code=400, detail="Tipo de documento no válido. Use 'resolucion', 'traslado' o 'tutor'.")
 
     # Si estamos en S3 / Cloudflare R2 / MinIO, redirigir a Presigned URL
     if storage_service.es_almacenamiento_s3():

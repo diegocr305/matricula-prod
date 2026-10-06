@@ -1,7 +1,7 @@
 # routers/dashboard.py
 from fastapi import APIRouter, Depends
 from typing import Optional
-from security import obtener_usuario_actual
+from security import obtener_usuario_actual, validar_acceso_colegio
 
 # Importamos la capa de servicio
 from services import dashboard_service
@@ -14,9 +14,7 @@ def obtener_estadisticas_dashboard(
     anio: Optional[int] = None, 
     usuario_actual: dict = Depends(obtener_usuario_actual)
 ):
-    rol = usuario_actual.get("rol")
-    if rol in ["Colegio", "Visualizador_Colegio"]:
-        establecimiento_id = usuario_actual.get("id_establecimiento")
+    establecimiento_id = validar_acceso_colegio(establecimiento_id, usuario_actual)
 
     return dashboard_service.obtener_estadisticas_dashboard_db(establecimiento_id, anio)
 

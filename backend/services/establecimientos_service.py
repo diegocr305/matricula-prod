@@ -69,22 +69,28 @@ def cargar_capacidades_excel_service(file: UploadFile, anio_escolar: int):
         cur.close()
         conn.close()
 
-def obtener_capacidad_curso(rbd: int, anio_escolar: int, nivel_str: str) -> int:
+def obtener_capacidad_curso(rbd: int, anio_escolar: int, nivel_str: str, cur = None) -> int:
     """
-    Función de consulta rápida para que el frontend pregunte cuál es el límite.
+    Función de consulta rápida para que el frontend o servicios pregunten cuál es el límite.
+    Permite inyectar un cursor activo para evitar deadlocks en el pool de conexiones.
     """
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
+    if cur is not None:
         cur.execute("""
             SELECT capacidad_sala FROM capacidad_oferta
             WHERE rbd = %s AND anio_escolar = %s AND nivel_str = %s
         """, (rbd, anio_escolar, nivel_str))
-        
         resultado = cur.fetchone()
-        
-        # Si no hay registro específico en el Excel, devolvemos 45 como límite legal por defecto
+        return resultado[0] if resultado else 45
+
+    conn = get_db_connection()
+    cur_local = conn.cursor()
+    try:
+        cur_local.execute("""
+            SELECT capacidad_sala FROM capacidad_oferta
+            WHERE rbd = %s AND anio_escolar = %s AND nivel_str = %s
+        """, (rbd, anio_escolar, nivel_str))
+        resultado = cur_local.fetchone()
         return resultado[0] if resultado else 45
     finally:
-        cur.close()
+        cur_local.close()
         conn.close()

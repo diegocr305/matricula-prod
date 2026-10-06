@@ -3,10 +3,11 @@ import React from 'react';
 import { 
   Search, User, UserCheck, Clock, ArrowLeft, ChevronRight, ChevronLeft, 
   UserPlus, Edit2, Save, X, CheckCircle, HeartPulse, ShieldAlert, Activity, 
-  Stethoscope, Check, FileText 
+  Stethoscope, Check, FileText, Globe, Building2, ChevronDown, ChevronUp, Calendar, Info 
 } from 'lucide-react';
 import { useEstudiantes } from './hooks/useEstudiantes'; 
 import { API_BASE_URL } from '../../config/api';
+import ModalDetalleMotivo from '../matriculas/components/ModalDetalleMotivo';
 
 export default function Estudiantes() {
   const {
@@ -18,6 +19,11 @@ export default function Estudiantes() {
     cargandoLista, estudiantesFiltrados,
     verFichaEstudiante,
     datosEdicion, setDatosEdicion,
+    // Contexto Institucional y Búsqueda Global
+    colegioSeleccionado, setColegioSeleccionado, establecimientos, esPerfilGlobal,
+    busquedaGlobal, setBusquedaGlobal,
+    // Paginación
+    page, setPage, totalPages, total,
     // Wizard Nuevo Estudiante
     vistaCrearEstudiante, setVistaCrearEstudiante,
     pasoCrear, irSiguientePasoCrear, irPasoAnteriorCrear, iniciarCrearEstudiante,
@@ -35,8 +41,22 @@ export default function Estudiantes() {
   const esIpeEstudiante = nuevoEstudiante.run.replace(/[^0-9kK]/g, '').length >= 10;
   const esIpaApoderado = nuevoEstudiante.run_apoderado.replace(/[^0-9kK]/g, '').length >= 10;
 
-  // Estado para el historial RGM colapsable
+  // Estado para el historial RGM colapsable y detalles individuales por matrícula
   const [historialExpandido, setHistorialExpandido] = React.useState(false);
+  const [detallesAbiertos, setDetallesAbiertos] = React.useState<Record<number, boolean>>({});
+  const [modalDetalleMotivoAbierto, setModalDetalleMotivoAbierto] = React.useState(false);
+  const [idMatriculaDetalleMotivo, setIdMatriculaDetalleMotivo] = React.useState<number | null>(null);
+  const [modoDetalleMotivo, setModoDetalleMotivo] = React.useState<'retiro' | 'cambio_curso'>('retiro');
+
+  const abrirModalDetalleMotivo = (id: number, modo: 'retiro' | 'cambio_curso') => {
+    setIdMatriculaDetalleMotivo(id);
+    setModoDetalleMotivo(modo);
+    setModalDetalleMotivoAbierto(true);
+  };
+
+  const toggleDetalleMatricula = (id: number) => {
+    setDetallesAbiertos(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto relative pb-10">
@@ -575,65 +595,253 @@ export default function Estudiantes() {
           VISTA 1: DIRECTORIO DE ESTUDIANTES
           ======================================================================= */}
       {!vistaCrearEstudiante && !datosEstudiante && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">🔍 Buscar</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                <input 
-                  type="text" placeholder="RUT o Nombre..."
-                  value={textoBusqueda} onChange={(e) => setTextoBusqueda(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                />
-              </div>
+        esPerfilGlobal && !colegioSeleccionado && !busquedaGlobal ? (
+          /* PANTALLA DE BLOQUEO / SELECCIÓN OBLIGATORIA (IDÉNTICA A MATRÍCULAS) */
+          <div className="bg-white border border-blue-200 p-8 sm:p-12 rounded-2xl shadow-sm text-center flex flex-col items-center justify-center max-w-2xl mx-auto space-y-6 animate-in fade-in duration-200">
+            <div className="w-16 h-16 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center shadow-inner text-3xl">
+              🏫
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📅 1. Año</label>
-              <select value={filtroAnio} onChange={(e) => setFiltroAnio(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white cursor-pointer">
-                <option value="">Todos los años</option>
-                {aniosUnicos.map((anio: any) => <option key={anio} value={anio}>{anio}</option>)}
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">
+                Seleccione un Establecimiento Educacional
+              </h2>
+              <p className="text-sm text-gray-600 max-w-xl leading-relaxed">
+                Para consultar el registro oficial y hacer uso de las funcionalidades del sistema, debe seleccionar un colegio específico.
+              </p>
+            </div>
+
+            {/* Selector directo de establecimiento */}
+            <div className="w-full bg-gray-50 p-4 rounded-xl border border-gray-200 text-left space-y-2">
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                🏫 Establecimiento:
+              </label>
+              <select
+                value={colegioSeleccionado}
+                onChange={(e) => {
+                  if (setColegioSeleccionado) setColegioSeleccionado(e.target.value);
+                }}
+                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">-- Seleccione un establecimiento de la lista --</option>
+                {establecimientos.map((col: any) => (
+                  <option key={col.id_establecimiento} value={col.id_establecimiento}>
+                    {col.nombre} {col.rbd ? `(RBD: ${col.rbd})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📚 2. Plan de Estudio</label>
-              <select value={filtroCodigo} onChange={(e) => setFiltroCodigo(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white cursor-pointer">
-                <option value="">Todos los planes</option>
-                {codigosUnicos.map((cod: any) => <option key={cod} value={cod}>Cod. {cod}</option>)}
-              </select>
+
+            <div className="relative flex items-center justify-center w-full">
+              <div className="border-t border-gray-200 w-full"></div>
+              <span className="bg-white px-3 text-xs text-gray-400 font-bold uppercase tracking-wider absolute">O bien</span>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">🏫 3. Curso</label>
-              <select value={filtroCurso} onChange={(e) => setFiltroCurso(e.target.value)} disabled={cursosUnicos.length === 0} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400">
-                <option value="">Todos los cursos</option>
-                {cursosUnicos.map((curso: any) => <option key={curso} value={curso}>{curso}</option>)}
-              </select>
+
+            {/* Opción Búsqueda General */}
+            <div 
+              onClick={() => setBusquedaGlobal(true)}
+              className="w-full p-4 bg-blue-50/70 border border-blue-200 rounded-xl text-left flex items-start gap-3.5 hover:bg-blue-100/60 transition-colors cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                id="check-busqueda-global-vacio"
+                checked={busquedaGlobal}
+                onChange={(e) => setBusquedaGlobal(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="check-busqueda-global-vacio" className="text-sm cursor-pointer select-none">
+                <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                  <Globe size={16} className="text-blue-600" /> Búsqueda General en todos los Establecimientos (Red SLEP)
+                </span>
+                <span className="block text-xs text-blue-700 mt-1 leading-relaxed">
+                  Permite buscar rápidamente a cualquier estudiante ingresando su RUT o nombre, incluso si no conoce su colegio actual o no se encuentra matriculado en ningún establecimiento.
+                </span>
+              </label>
             </div>
           </div>
+        ) : (
+          /* TABLA / DIRECTORIO DE ESTUDIANTES */
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            
+            {/* Barra informativa de Modo para Perfiles Globales */}
+            {esPerfilGlobal && (
+              <div className={`px-4 py-3 border-b flex flex-wrap items-center justify-between gap-3 text-sm ${
+                busquedaGlobal 
+                  ? 'bg-amber-50 border-amber-200 text-amber-900' 
+                  : 'bg-blue-50 border-blue-100 text-blue-900'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {busquedaGlobal ? (
+                    <>
+                      <Globe size={18} className="text-amber-600 shrink-0" />
+                      <span className="font-bold">Modo Búsqueda General Activo:</span>
+                      <span className="text-xs text-amber-800">Buscando en toda la Red SLEP Valparaíso</span>
+                    </>
+                  ) : (
+                    <>
+                      <Building2 size={18} className="text-blue-600 shrink-0" />
+                      <span className="font-bold">Establecimiento seleccionado:</span>
+                      <span className="text-xs text-blue-800 font-medium">
+                        {establecimientos.find((e: any) => String(e.id_establecimiento) === String(colegioSeleccionado))?.nombre || `ID: ${colegioSeleccionado}`}
+                      </span>
+                    </>
+                  )}
+                </div>
 
-          <ul className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-            {cargandoLista ? (
-              <div className="p-8 text-center text-gray-500">Cargando directorio...</div>
-            ) : estudiantesFiltrados.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No hay estudiantes que coincidan con los filtros.</div>
-            ) : (
-              estudiantesFiltrados.map((est: any) => (
-                <li key={est.id}>
-                  <button 
-                    onClick={() => verFichaEstudiante(est.run)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-blue-50 transition-colors text-left"
-                  >
-                    <div>
-                      <p className="font-semibold text-gray-800 text-lg">{est.nombre_completo}</p>
-                      <p className="text-sm text-gray-500">RUT: {est.run} {est.curso ? `| Curso: ${est.curso}` : ''}</p>
-                    </div>
-                    <div className="text-blue-500"><ChevronRight size={20} /></div>
-                  </button>
-                </li>
-              ))
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold px-3 py-1.5 rounded-lg bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={busquedaGlobal}
+                    onChange={(e) => setBusquedaGlobal(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <Globe size={14} className={busquedaGlobal ? "text-amber-600" : "text-blue-600"} />
+                  <span>🌐 Búsqueda general en todos los colegios</span>
+                </label>
+              </div>
             )}
-          </ul>
-        </div>
+
+            {/* Fila de Filtros */}
+            <div className={`p-4 border-b border-gray-100 bg-gray-50 grid grid-cols-1 ${busquedaGlobal ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-4`}>
+              <div className={busquedaGlobal ? 'md:col-span-1' : ''}>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">🔍 Buscar</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder={busquedaGlobal ? "Escriba RUT o Nombre (mínimo 2 caracteres)..." : "RUT o Nombre..."}
+                    value={textoBusqueda} 
+                    onChange={(e) => setTextoBusqueda(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              {!busquedaGlobal ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📅 1. Año</label>
+                    <select value={filtroAnio} onChange={(e) => setFiltroAnio(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white cursor-pointer">
+                      <option value="">Todos los años</option>
+                      {aniosUnicos.map((anio: any) => <option key={anio} value={anio}>{anio}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📚 2. Plan de Estudio</label>
+                    <select value={filtroCodigo} onChange={(e) => setFiltroCodigo(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white cursor-pointer">
+                      <option value="">Todos los planes</option>
+                      {codigosUnicos.map((cod: any) => <option key={cod} value={cod}>Cod. {cod}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">🏫 3. Curso</label>
+                    <select value={filtroCurso} onChange={(e) => setFiltroCurso(e.target.value)} disabled={cursosUnicos.length === 0} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400">
+                      <option value="">Todos los cursos</option>
+                      {cursosUnicos.map((curso: any) => <option key={curso} value={curso}>{curso}</option>)}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📅 Filtrar por Año (Opcional)</label>
+                  <select value={filtroAnio} onChange={(e) => setFiltroAnio(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none bg-white cursor-pointer">
+                    <option value="">Histórico (Todos los años)</option>
+                    {aniosUnicos.map((anio: any) => <option key={anio} value={anio}>{anio}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Listado de Resultados */}
+            <ul className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+              {busquedaGlobal && (!textoBusqueda || textoBusqueda.trim().length < 2) ? (
+                <div className="p-10 text-center text-gray-500 space-y-2">
+                  <div className="text-3xl">🌐</div>
+                  <p className="font-bold text-gray-700">Ingrese al menos 2 caracteres en el buscador</p>
+                  <p className="text-xs text-gray-500 max-w-md mx-auto">
+                    Para consultar en toda la Red SLEP Valparaíso (más de 35.000 registros), escriba el RUT o parte del nombre del estudiante.
+                  </p>
+                </div>
+              ) : cargandoLista ? (
+                <div className="p-8 text-center text-gray-500 flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Cargando estudiantes...</span>
+                </div>
+              ) : estudiantesFiltrados.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No se encontraron estudiantes que coincidan con los criterios de búsqueda.
+                </div>
+              ) : (
+                estudiantesFiltrados.map((est: any) => (
+                  <li key={est.id}>
+                    <button 
+                      onClick={() => verFichaEstudiante(est.run)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-blue-50/60 transition-colors text-left"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-800 text-base">{est.nombre_completo}</p>
+                          {est.estado && (
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                              est.estado.toLowerCase() === 'activa' ? 'bg-emerald-100 text-emerald-800' :
+                              est.estado.toLowerCase() === 'retirada' || est.estado.toLowerCase() === 'inactiva' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {est.estado}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="font-mono font-medium text-gray-700">RUT: {est.run}</span>
+                          {est.curso && <span>• Curso: {est.curso}</span>}
+                          {est.anio && <span>• Año: {est.anio}</span>}
+                          {(busquedaGlobal || esPerfilGlobal) && est.nombre_colegio && (
+                            <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs font-semibold">
+                              🏫 {est.nombre_colegio}
+                            </span>
+                          )}
+                          {(busquedaGlobal || esPerfilGlobal) && !est.nombre_colegio && (
+                            <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-xs font-medium">
+                              Sin matrícula activa registrada
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-blue-500 shrink-0 ml-4"><ChevronRight size={20} /></div>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <div className="p-3.5 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-gray-600 font-medium">
+                  Página <strong className="text-gray-900">{page}</strong> de <strong className="text-gray-900">{totalPages}</strong> ({total} estudiantes)
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page <= 1 || cargandoLista}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  >
+                    <ChevronLeft size={16} /> Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page >= totalPages || cargandoLista}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  >
+                    Siguiente <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )
       )}
 
       {/* =======================================================================
@@ -758,10 +966,13 @@ export default function Estudiantes() {
                 const hayMas = historialOrdenado.length > LIMITE_VISIBLE;
 
                 const coloresEstado: Record<string, string> = {
-                  Activa:   'bg-green-100 text-green-700 border border-green-200',
-                  Retirado: 'bg-red-50 text-red-600 border border-red-100',
-                  Inactiva: 'bg-orange-50 text-orange-600 border border-orange-100',
-                  Anulada:  'bg-gray-100 text-gray-400 border border-gray-200',
+                  Activa:      'bg-green-100 text-green-700 border border-green-200',
+                  Retirado:    'bg-red-50 text-red-600 border border-red-100',
+                  Inactiva:    'bg-orange-50 text-orange-600 border border-orange-100',
+                  Anulada:     'bg-gray-100 text-gray-400 border border-gray-200',
+                  Promovido:   'bg-blue-100 text-blue-700 border border-blue-200',
+                  Repitente:   'bg-amber-100 text-amber-800 border border-amber-200',
+                  Trasladado:  'bg-purple-100 text-purple-800 border border-purple-200',
                 };
 
                 return (
@@ -786,41 +997,208 @@ export default function Estudiantes() {
                       {registrosVisibles.map((reg: any) => {
                         const esVigente = reg.estado === 'Activa' && reg.anio === anioActual;
                         const esActivoAnterior = reg.estado === 'Activa' && !esVigente;
-                        const badgeCls = esActivoAnterior
-                          ? 'bg-gray-100 text-gray-500 border border-gray-200'
-                          : (coloresEstado[reg.estado] ?? 'bg-gray-100 text-gray-500 border border-gray-200');
-                        const badgeLabel = esActivoAnterior ? 'Promovido' : reg.estado;
+                        const esTraslado = (reg.estado === 'Retirado' || reg.estado === 'Inactiva') &&
+                          ((reg.motivo_retiro && reg.motivo_retiro.toLowerCase().includes('traslado')) ||
+                           (reg.observaciones && reg.observaciones.toLowerCase().includes('traslado')));
+
+                        let badgeLabel = reg.estado;
+                        let badgeCls = coloresEstado[reg.estado] ?? 'bg-gray-100 text-gray-500 border border-gray-200';
+
+                        if (esTraslado) {
+                          badgeLabel = 'Trasladado';
+                          badgeCls = coloresEstado['Trasladado'];
+                        } else if (esActivoAnterior) {
+                          badgeLabel = 'Promovido';
+                          badgeCls = 'bg-gray-100 text-gray-500 border border-gray-200';
+                        }
+
+                        const estaAbierto = !!detallesAbiertos[reg.id];
+
+                        // Desglose de observaciones/hitos de trazabilidad garantizando confidencialidad
+                        const tieneObservaciones = reg.observaciones && reg.observaciones.trim() !== '' && reg.observaciones !== 'Sin observaciones.';
+                        const hitosObservaciones = tieneObservaciones 
+                          ? reg.observaciones.split('|').map((s: string) => {
+                              const t = s.trim();
+                              if (t.includes('[Motivos de Retiro]')) {
+                                return 'Retiro formalizado mediante cuestionario confidencial de apoderado.';
+                              }
+                              return t;
+                            }).filter(Boolean)
+                          : [];
 
                         return (
                           <div
                             key={reg.id}
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors ${
+                            className={`flex flex-col rounded-xl border transition-all duration-200 overflow-hidden ${
                               esVigente
-                                ? 'bg-green-50 border-green-200'
-                                : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
+                                ? 'bg-green-50/60 border-green-200 shadow-2xs'
+                                : esTraslado
+                                ? 'bg-purple-50/40 border-purple-200 shadow-2xs'
+                                : 'bg-gray-50/80 border-gray-200/80 hover:border-gray-300'
                             }`}
                           >
-                            {/* Pill de año */}
-                            <div className={`shrink-0 w-12 text-center text-[13px] font-black rounded-lg py-1 ${
-                              esVigente ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
-                            }`}>
-                              {reg.anio}
+                            {/* Fila Principal / Cabecera Resumen de la Matrícula */}
+                            <div className="flex items-center justify-between p-3 gap-3">
+                              {/* Izquierda: Pill de Año + Colegio y Curso */}
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`shrink-0 w-12 text-center text-xs font-black rounded-lg py-1.5 shadow-2xs ${
+                                  esVigente ? 'bg-green-600 text-white' : esTraslado ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'
+                                }`}>
+                                  {reg.anio}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-xs font-bold truncate ${esVigente ? 'text-green-950' : 'text-gray-900'}`}>
+                                    {reg.establecimiento}
+                                  </p>
+                                  <div className="flex items-center gap-2 text-[11px] text-gray-500 font-mono mt-0.5">
+                                    <span className="font-semibold text-gray-700">{reg.curso || 'Sin curso'}</span>
+                                    <span>·</span>
+                                    <span>RBD: {reg.rbd}</span>
+                                    {reg.fecha_retiro && (
+                                      <>
+                                        <span>·</span>
+                                        <span className="text-red-600 font-sans font-medium">Retiro: {reg.fecha_retiro}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Derecha: Badge Estado + Pestaña / Botón de Detalle */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${badgeCls}`}>
+                                  {badgeLabel}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDetalleMatricula(reg.id)}
+                                  className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all cursor-pointer ${
+                                    estaAbierto
+                                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                                      : 'bg-white text-gray-700 hover:text-purple-700 hover:bg-purple-50/80 border-gray-300 hover:border-purple-300 shadow-2xs'
+                                  }`}
+                                  title={estaAbierto ? "Ocultar detalles de la matrícula" : "Ver detalles completos de la matrícula"}
+                                >
+                                  <span>Detalle</span>
+                                  {estaAbierto ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                </button>
+                              </div>
                             </div>
 
-                            {/* Establecimiento + RBD + Curso */}
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-xs font-bold truncate ${esVigente ? 'text-green-900' : 'text-gray-800'}`}>
-                                {reg.establecimiento}
-                              </p>
-                              <p className="text-[11px] text-gray-400 font-mono">
-                                RBD: {reg.rbd}&nbsp;·&nbsp;{reg.curso || 'Sin curso'}
-                              </p>
-                            </div>
+                            {/* Pestaña / Panel Desplegable de Detalles Ordenados */}
+                            {estaAbierto && (
+                              <div className="px-3.5 pb-3.5 pt-2.5 border-t border-gray-200/80 bg-white/80 space-y-2.5">
+                                {/* Cuadrícula de Información Estructurada */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                  <div className="bg-white p-2.5 rounded-lg border border-gray-200 shadow-2xs">
+                                    <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Fecha de Matrícula</span>
+                                    <p className="font-semibold text-gray-800 mt-0.5 flex items-center gap-1.5">
+                                      <Calendar size={13} className="text-purple-500" />
+                                      {reg.fecha_matricula || 'No registrada'}
+                                    </p>
+                                  </div>
 
-                            {/* Badge estado */}
-                            <span className={`shrink-0 px-2 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${badgeCls}`}>
-                              {badgeLabel}
-                            </span>
+                                  <div className="bg-white p-2.5 rounded-lg border border-gray-200 shadow-2xs">
+                                    <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Curso y Nivel</span>
+                                    <p className="font-semibold text-gray-800 mt-0.5">
+                                      {reg.curso || 'Sin curso asignado'} {reg.nivel_ensenanza ? `· ${reg.nivel_ensenanza}` : ''}
+                                    </p>
+                                  </div>
+
+                                  {reg.fecha_retiro && (
+                                    <div className="bg-red-50/60 p-2.5 rounded-lg border border-red-200 shadow-2xs">
+                                      <span className="text-[10px] uppercase font-bold text-red-500 block tracking-wider">Fecha de Retiro Oficial</span>
+                                      <p className="font-semibold text-red-800 mt-0.5">
+                                        {reg.fecha_retiro}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {reg.motivo_retiro && (
+                                    <div className="bg-red-50/60 p-2.5 rounded-lg border border-red-200 shadow-2xs">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] uppercase font-bold text-red-500 block tracking-wider">Causa / Motivo del Retiro</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => abrirModalDetalleMotivo(reg.id, 'retiro')}
+                                          className="text-[11px] font-bold text-red-700 hover:text-red-900 underline cursor-pointer"
+                                          title="Ver razones y justificación de retiro"
+                                        >
+                                          Ver Razones
+                                        </button>
+                                      </div>
+                                      <p className="font-semibold text-red-800 mt-0.5">
+                                        {reg.motivo_retiro}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {reg.motivo_cambio_curso && !reg.motivo_cambio_curso.startsWith('PENDIENTE_TRASLADO') && (
+                                    <div className="bg-purple-50/60 p-2.5 rounded-lg border border-purple-200 shadow-2xs">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] uppercase font-bold text-purple-700 block tracking-wider">Cambio de Curso / Traslado</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => abrirModalDetalleMotivo(reg.id, 'cambio_curso')}
+                                          className="text-[11px] font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer"
+                                          title="Ver justificación y detalles del cambio de curso"
+                                        >
+                                          Ver Justificación
+                                        </button>
+                                      </div>
+                                      <p className="font-semibold text-purple-900 mt-0.5 truncate">
+                                        {reg.motivo_cambio_curso}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Bloque de Trazabilidad y Observaciones Desglosado */}
+                                {hitosObservaciones.length > 0 && (
+                                  <div className="bg-white p-2.5 rounded-lg border border-gray-200 shadow-2xs space-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-gray-700">
+                                      <Info size={13} className="text-purple-600" />
+                                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                                        Trazabilidad y Observaciones
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1 pl-1">
+                                      {hitosObservaciones.map((hito: string, idx: number) => (
+                                        <div key={idx} className="flex items-start gap-2 text-[11px] text-gray-600 leading-relaxed">
+                                          <span className="text-purple-600 font-bold shrink-0 mt-0.5">•</span>
+                                          <span>{hito}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Certificado de Traslado si existe */}
+                                {reg.ruta_documento_traslado && (
+                                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-purple-50 border border-purple-200 shadow-2xs">
+                                    <div className="flex items-center gap-2 text-purple-900">
+                                      <FileText size={15} className="text-purple-600 shrink-0" />
+                                      <span className="text-xs font-bold">Certificado de Traslado Oficial Adjunto</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const token = localStorage.getItem('token');
+                                        window.open(`${API_BASE_URL}/documentos/adjunto?tipo=traslado&id=${reg.id}&token=${token}`, '_blank');
+                                      }}
+                                      className="px-3 py-1 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-md shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                                      title="Descargar Certificado de Traslado Adjunto"
+                                    >
+                                      <span>Descargar</span>
+                                      <ChevronRight size={13} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1233,6 +1611,16 @@ export default function Estudiantes() {
         );
       })()}
 
+      <ModalDetalleMotivo
+        isOpen={modalDetalleMotivoAbierto}
+        onClose={() => setModalDetalleMotivoAbierto(false)}
+        idMatricula={idMatriculaDetalleMotivo}
+        modoInicial={modoDetalleMotivo}
+        onAbrirCertificado={(id, tipo) => {
+          const token = localStorage.getItem('token');
+          window.open(`${API_BASE_URL}/matriculas/${id}/certificado?tipo=${tipo}&token=${token}`, '_blank');
+        }}
+      />
     </div>
   );
 }

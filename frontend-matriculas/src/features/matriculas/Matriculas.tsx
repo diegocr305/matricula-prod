@@ -1,19 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertOctagon, CheckCircle2 } from 'lucide-react';
+import { AlertOctagon, CheckCircle2, Users, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import ModalEmisionDocumento from '../../components/ModalEmisionDocumento';
 import ModalDescargaExcel from './components/ModalDescargaExcel';
+import ModalDetalleMotivo from './components/ModalDetalleMotivo';
 import { useMatriculas } from './hooks/useMatriculas'; 
 import { API_BASE_URL } from '../../config/api';
 
 export default function Matriculas() {
   const {
-    colegioSeleccionado, puedeEditar, puedeCargarSIGE, anioActual,
+    colegioSeleccionado, setColegioSeleccionado, establecimientos, esPerfilGlobal,
+    puedeEditar, puedeCargarSIGE, anioActual,
     cargando, error, subiendoArchivo,
     busqueda, setBusqueda,
     filtroAnio, setFiltroAnio,
     filtroCodigo, setFiltroCodigo,
     filtroCurso, setFiltroCurso,
+    filtroEstado, setFiltroEstado,
     ordenEstado, setOrdenEstado,
     aniosUnicos, codigosUnicos, cursosUnicos, estructuraColegio, matriculasProcesadas,
     modalCursoAbierto, setModalCursoAbierto, procesandoCurso,
@@ -24,13 +27,26 @@ export default function Matriculas() {
     enviarApoderadoRetiro, setEnviarApoderadoRetiro, correoApoderadoRetiro, setCorreoApoderadoRetiro,
     descargarLocalRetiro, setDescargarLocalRetiro,
     modalEmisionAbierto, setModalEmisionAbierto, datosEmision,
+    matriculaSeleccionada,
     manejarSubidaCSV, abrirModalEmision, iniciarRetiro, confirmarRetiro, 
     iniciarCambioCurso, confirmarCambioCurso,
     mostrarCupos, cuposOcupados, capacidadSala, descargandoExcel, exportarAExcel,
     capacidadCursoDestino, cargandoCapacidadDestino, matriculadosCursoDestino, cursoDestinoLleno, cuposPorCurso,
+    cursoActual, estudiantesCursoDestino, cargandoEstudiantesDestino, esMismoCurso,
     modalExcelAbierto, setModalExcelAbierto,
     page, setPage, totalPages, total,
   } = useMatriculas();
+
+  const [mostrarListaDestino, setMostrarListaDestino] = useState(false);
+  const [modalDetalleMotivoAbierto, setModalDetalleMotivoAbierto] = useState(false);
+  const [idMatriculaDetalleMotivo, setIdMatriculaDetalleMotivo] = useState<number | null>(null);
+  const [modoDetalleMotivo, setModoDetalleMotivo] = useState<'retiro' | 'cambio_curso'>('retiro');
+
+  const abrirModalDetalleMotivo = (id: number, modo: 'retiro' | 'cambio_curso') => {
+    setIdMatriculaDetalleMotivo(id);
+    setModoDetalleMotivo(modo);
+    setModalDetalleMotivoAbierto(true);
+  };
 
   const formatearNombreCorto = (nombre?: string) => {
     if (!nombre || nombre === 'Pendiente' || nombre === 'Sin registro') {
@@ -39,6 +55,102 @@ export default function Matriculas() {
     const palabras = nombre.trim().split(/\s+/);
     if (palabras.length <= 2) return nombre;
     return `${palabras[0]} ${palabras[1]}`;
+  };
+
+  const renderEstadoBadge = (mat: any) => {
+    const estado = (mat.estado || '').trim();
+    const estadoLower = estado.toLowerCase();
+    const motivoCambio = (mat.motivo_cambio_curso || '').trim();
+
+    if (estadoLower === 'pendiente retiro') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm animate-pulse" title="En proceso de baja - esperando respuesta a encuesta del apoderado">
+          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+          Pendiente Retiro
+        </span>
+      );
+    }
+    if (motivoCambio.startsWith('PENDIENTE_TRASLADO')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-300 shadow-sm" title="Solicitud de traslado de sala en proceso">
+          <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+          Traslado Pendiente
+        </span>
+      );
+    }
+    const esTraslado = (mat.motivo_retiro && mat.motivo_retiro.toLowerCase().includes('traslado')) ||
+                       (mat.observaciones && mat.observaciones.toLowerCase().includes('traslado'));
+
+    if (esTraslado && (estadoLower === 'retirado' || estadoLower === 'retirada' || estadoLower === 'inactiva' || estadoLower === 'inactivo')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-sm" title={mat.observaciones || "Retirado por traslado a otro establecimiento"}>
+          <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+          Trasladado
+        </span>
+      );
+    }
+    if (estadoLower === 'promovido' || estadoLower === 'promovida') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-sm" title="Alumno promovido">
+          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+          Promovido
+        </span>
+      );
+    }
+    if (estadoLower === 'repitente') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm" title="Alumno repitente">
+          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+          Repitente
+        </span>
+      );
+    }
+    if (estadoLower === 'retirado' || estadoLower === 'retirada') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200" title="Matrícula finalizada / Alumno retirado">
+          <span className="w-2 h-2 rounded-full bg-red-500"></span>
+          Retirado
+        </span>
+      );
+    }
+    if (estadoLower === 'inactiva' || estadoLower === 'inactivo') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200" title="Matrícula inactiva (baja o retiro registrado en SIGE)">
+          <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+          Inactiva
+        </span>
+      );
+    }
+    if (estadoLower === 'pendiente firma') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-300 shadow-sm" title="Pendiente de firma del apoderado">
+          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+          Pendiente Firma
+        </span>
+      );
+    }
+    if (estadoLower === 'anulada' || estadoLower === 'anulado') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-300" title="Matrícula anulada">
+          <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+          Anulada
+        </span>
+      );
+    }
+    if (estadoLower === 'activa' || estadoLower === 'activo') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-sm" title="Matrícula regular activa">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          Activa
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-300" title={`Estado: ${estado || 'Sin estado'}`}>
+        <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+        {estado || 'Sin Estado'}
+      </span>
+    );
   };
 
   return (
@@ -80,22 +192,49 @@ export default function Matriculas() {
                   </label>
                 </>
               )}
-              <Link to="/matriculas/nueva" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                + Renovar Matrícula
-              </Link>
+              {colegioSeleccionado && (
+                <Link to="/matriculas/nueva" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                  + Renovar Matrícula
+                </Link>
+              )}
             </>
           )}
         </div>
       </div>                         
 
       {!cargando && !error && !colegioSeleccionado && (
-        <div className="bg-blue-50 border border-blue-200 p-10 rounded-xl shadow-sm text-center flex flex-col items-center justify-center">
-          <div className="text-4xl mb-4">🏫</div>
-          <h2 className="text-xl font-extrabold text-blue-900 mb-2">Seleccione un Establecimiento</h2>
-          <p className="text-blue-700 max-w-2xl">
-            Para garantizar la velocidad del sistema, la vista global ha sido deshabilitada. 
-            Por favor, <strong>utilice el "Filtro Institucional" en la barra superior</strong> y elija un colegio específico para cargar su registro de matrículas.
-          </p>
+        <div className="bg-white border border-blue-200 p-8 sm:p-12 rounded-2xl shadow-sm text-center flex flex-col items-center justify-center max-w-2xl mx-auto space-y-6 animate-in fade-in duration-200">
+          <div className="w-16 h-16 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center shadow-inner text-3xl">
+            🏫
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">
+              Seleccione un Establecimiento Educacional
+            </h2>
+            <p className="text-sm text-gray-600 max-w-xl leading-relaxed">
+              Para consultar el registro oficial y hacer uso de las funcionalidades del sistema, debe seleccionar un colegio específico.
+            </p>
+          </div>
+
+          <div className="w-full bg-gray-50 p-4 rounded-xl border border-gray-200 text-left space-y-2">
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+              🏫 Establecimiento:
+            </label>
+            <select
+              value={colegioSeleccionado}
+              onChange={(e) => {
+                if (setColegioSeleccionado) setColegioSeleccionado(e.target.value);
+              }}
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="">-- Seleccione un establecimiento de la lista --</option>
+              {establecimientos.map((col: any) => (
+                <option key={col.id_establecimiento} value={col.id_establecimiento}>
+                  {col.nombre} {col.rbd ? `(RBD: ${col.rbd})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -103,7 +242,7 @@ export default function Matriculas() {
       {error && <p className="text-red-500 font-medium">Error: {error}</p>}
 
       {!cargando && !error && matriculasProcesadas.length >= 0 && colegioSeleccionado && (
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">🔍 Buscar</label>
             <input type="text" placeholder="RUT o Nombre." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-blue-500 outline-none" />
@@ -127,6 +266,18 @@ export default function Matriculas() {
             <select value={filtroCurso} onChange={(e) => { setFiltroCurso(e.target.value); setPage(1); }} disabled={cursosUnicos.length === 0} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400">
               <option value="">Todos los cursos</option>
               {cursosUnicos.map(curso => <option key={curso} value={curso}>{curso}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">📋 4. Estado</label>
+            <select value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPage(1); }} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white cursor-pointer">
+              <option value="">Todos los estados</option>
+              <option value="Activa">Solo Activas</option>
+              <option value="traslados">Traslados Intercolegio</option>
+              <option value="Inactiva">Inactivas / Retirados</option>
+              <option value="Pendiente Retiro">Pendientes de Retiro</option>
+              <option value="Pendiente_Traslado">Traslados Pendientes</option>
+              <option value="Anulada">Anuladas</option>
             </select>
           </div>
         </div>
@@ -226,15 +377,7 @@ export default function Matriculas() {
                     <td className="p-4 text-center font-semibold text-gray-700">{mat.anio_escolar}</td>
                     <td className="p-4">
                       <div className="flex flex-col gap-1.5 items-start">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                          mat.estado === 'Activa' 
-                            ? 'bg-green-50 text-green-700 border-green-200' 
-                            : mat.estado === 'Pendiente Retiro'
-                            ? 'bg-amber-50 text-amber-800 border-amber-300'
-                            : 'bg-red-50 text-red-700 border-red-200'
-                        }`}>
-                          {mat.estado === 'Pendiente Retiro' ? '⏳ Pendiente Retiro' : mat.estado}
-                        </span>
+                        {renderEstadoBadge(mat)}
                         {mat.estado_renovacion && (
                           <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border whitespace-nowrap ${
                             mat.estado_renovacion === 'Firmada'
@@ -272,6 +415,19 @@ export default function Matriculas() {
                             Resolución PDF
                           </button>
                         )}
+                        {mat.ruta_documento_traslado && (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const token = localStorage.getItem('token');
+                              window.open(`${API_BASE_URL}/documentos/adjunto?tipo=traslado&id=${mat.id_matricula}&token=${token}`, '_blank');
+                            }}
+                            className="text-purple-600 hover:text-purple-800 font-semibold text-xs transition-colors underline cursor-pointer"
+                            title="Ver Certificado de Traslado Adjunto"
+                          >
+                            Cert. Traslado
+                          </button>
+                        )}
                         {mat.estado === 'Pendiente Retiro' && (
                           <a 
                             href={`/encuesta-retiro/${mat.id_matricula}`} 
@@ -293,6 +449,36 @@ export default function Matriculas() {
                           >
                             Justificar Traslado
                           </a>
+                        )}
+                        {(mat.estado === 'Inactiva' || mat.estado === 'Retirado' || mat.estado === 'Retirada') && (
+                          <>
+                            <button 
+                              type="button"
+                              onClick={() => abrirModalEmision(mat.id_matricula, 'RETIRO')} 
+                              className="text-red-600 hover:text-red-800 font-medium transition-colors text-xs cursor-pointer"
+                              title="Emitir Comprobante de Retiro"
+                            >
+                              Cert. Retiro
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => abrirModalDetalleMotivo(mat.id_matricula, 'retiro')}
+                              className="text-amber-700 hover:text-amber-900 font-semibold transition-colors text-xs cursor-pointer underline"
+                              title="Ver causa y motivos detallados del retiro"
+                            >
+                              Motivo Retiro
+                            </button>
+                          </>
+                        )}
+                        {((mat.motivo_cambio_curso && !mat.motivo_cambio_curso.startsWith('PENDIENTE_TRASLADO')) || (mat.observaciones && mat.observaciones.toLowerCase().includes('traslado formalizado'))) && (
+                          <button
+                            type="button"
+                            onClick={() => abrirModalDetalleMotivo(mat.id_matricula, 'cambio_curso')}
+                            className="text-purple-700 hover:text-purple-900 font-semibold transition-colors text-xs cursor-pointer underline"
+                            title="Ver justificación y detalles del cambio de curso"
+                          >
+                            Motivo Traslado
+                          </button>
                         )}
                         {mat.estado === 'Activa' && (
                           <>
@@ -377,6 +563,40 @@ export default function Matriculas() {
               <p><strong>Normativa SLEP:</strong> El traslado requiere la justificación obligatoria del apoderado mediante encuesta. Al confirmar, se enviará el formulario al apoderado y el cambio de sala se aplicará automáticamente en el sistema en cuanto el apoderado responda la justificación.</p>
             </div>
 
+            {matriculaSeleccionada && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-4 text-xs space-y-2">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                  <span className="font-bold text-slate-700">Resumen de la Acción:</span>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-semibold">Traslado de Sala</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-600">
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">Estudiante:</span>
+                    <strong className="text-slate-800">{matriculaSeleccionada.estudiante_nombre}</strong>
+                    <div className="text-slate-500 font-mono text-[11px]">{matriculaSeleccionada.estudiante_rut}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">Curso Origen:</span>
+                    <strong className="text-slate-800">{matriculaSeleccionada.curso}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">Curso Destino:</span>
+                    <strong className="text-blue-700 font-bold">{cursoDestino || 'Por seleccionar...'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">Disponibilidad Destino:</span>
+                    {cursoDestino ? (
+                      <span className={cursoDestinoLleno ? 'text-red-600 font-bold' : 'text-emerald-700 font-bold'}>
+                        {matriculadosCursoDestino} / {capacidadCursoDestino} cupos
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={confirmarCambioCurso} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">1. Plan de Destino</label>
@@ -395,23 +615,35 @@ export default function Matriculas() {
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">2. Curso Específico</label>
                 <select 
-                  value={cursoDestino} onChange={(e) => setCursoDestino(e.target.value)} 
+                  value={cursoDestino} onChange={(e) => {
+                    setCursoDestino(e.target.value);
+                    setMostrarListaDestino(false);
+                  }} 
                   className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white disabled:bg-gray-100 outline-none"
                   disabled={!planDestino} required
                 >
                   <option value="">Seleccione la sala...</option>
                   {planDestino && Array.from(estructuraColegio[planDestino].cursos).sort().map(curso => {
                     const cant = cuposPorCurso[curso] || 0;
+                    const esActual = Boolean(cursoActual && curso.trim().toLowerCase() === cursoActual.trim().toLowerCase());
                     return (
-                      <option key={curso} value={curso}>
-                        {curso} ({cant} matriculados)
+                      <option key={curso} value={curso} disabled={esActual}>
+                        {curso} ({cant} matriculados){esActual ? ' — [Curso actual del alumno]' : ''}
                       </option>
                     );
                   })}
                 </select>
 
+                {/* AVISO SI ELIGE EL MISMO CURSO */}
+                {esMismoCurso && (
+                  <div className="mt-2.5 p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl flex gap-2.5 items-center text-xs">
+                    <AlertCircle className="text-amber-600 shrink-0" size={18} />
+                    <span>El estudiante ya está matriculado en este curso (<strong>{cursoActual}</strong>). Por favor seleccione un curso de destino diferente.</span>
+                  </div>
+                )}
+
                 {/* AVISO DE CAPACIDAD DE SALA / CURSO LLENO */}
-                {cursoDestino && (
+                {cursoDestino && !esMismoCurso && (
                   <div>
                     {cargandoCapacidadDestino ? (
                       <p className="text-xs text-gray-500 italic mt-1.5 animate-pulse">
@@ -435,10 +667,60 @@ export default function Matriculas() {
                           <CheckCircle2 size={16} className="text-emerald-600" /> Disponibilidad en {cursoDestino}:
                         </span>
                         <span className="font-bold bg-white px-2 py-0.5 rounded border border-emerald-300 text-emerald-900">
-                          {matriculadosCursoDestino} / {capacidadCursoDestino} cupos ({capacidadCursoDestino - matriculadosCursoDestino} vacantes)
+                          {matriculadosCursoDestino} / {capacidadCursoDestino} cupos ({Math.max(0, capacidadCursoDestino - matriculadosCursoDestino)} vacantes)
                         </span>
                       </div>
                     )}
+
+                    {/* COMPONENTE: Nómina de Estudiantes Matriculados en el Curso Destino */}
+                    <div className="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
+                      <button
+                        type="button"
+                        onClick={() => setMostrarListaDestino(!mostrarListaDestino)}
+                        className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Users size={15} className="text-blue-600" />
+                          Estudiantes ya matriculados en esta sala ({estudiantesCursoDestino.length})
+                        </span>
+                        {mostrarListaDestino ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+
+                      {mostrarListaDestino && (
+                        <div className="p-2 border-t border-slate-200 max-h-48 overflow-y-auto bg-white text-xs">
+                          {cargandoEstudiantesDestino ? (
+                            <p className="text-center py-2 text-slate-400 italic">Cargando nómina del curso...</p>
+                          ) : estudiantesCursoDestino.length === 0 ? (
+                            <p className="text-center py-2 text-slate-400">No hay estudiantes activos en este curso aún.</p>
+                          ) : (
+                            <table className="w-full text-left">
+                              <thead>
+                                <tr className="border-b text-[11px] text-slate-500">
+                                  <th className="py-1 px-1.5 w-10">N°</th>
+                                  <th className="py-1 px-1.5">Estudiante</th>
+                                  <th className="py-1 px-1.5 text-right">RUN</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {estudiantesCursoDestino.map((est, idx) => (
+                                  <tr key={est.id_matricula || idx} className="hover:bg-slate-50">
+                                    <td className="py-1 px-1.5 font-mono text-slate-400 text-[11px]">
+                                      {est.numero_correlativo || idx + 1}
+                                    </td>
+                                    <td className="py-1 px-1.5 font-medium text-slate-800">
+                                      {est.nombre_completo}
+                                    </td>
+                                    <td className="py-1 px-1.5 text-right font-mono text-slate-600 text-[11px]">
+                                      {est.run}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 
@@ -468,18 +750,20 @@ export default function Matriculas() {
                 <button type="button" onClick={() => setModalCursoAbierto(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">Cancelar</button>
                 <button 
                   type="submit" 
-                  disabled={procesandoCurso || !cursoDestino || cursoDestinoLleno || cargandoCapacidadDestino} 
+                  disabled={procesandoCurso || !cursoDestino || cursoDestinoLleno || cargandoCapacidadDestino || esMismoCurso} 
                   className={`px-4 py-2 text-white rounded-lg text-sm font-bold transition-all shadow-sm ${
-                    cursoDestinoLleno
+                    cursoDestinoLleno || esMismoCurso
                       ? 'bg-red-400 cursor-not-allowed opacity-80'
                       : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50'
                   }`}
                 >
                   {procesandoCurso 
                     ? 'Procesando...' 
-                    : cursoDestinoLleno 
-                      ? 'Curso sin cupos disponibles (Lleno)' 
-                      : 'Enviar Solicitud y Encuesta al Apoderado'}
+                    : esMismoCurso
+                      ? 'Estudiante ya está en este curso'
+                      : cursoDestinoLleno 
+                        ? 'Curso sin cupos disponibles (Lleno)' 
+                        : 'Enviar Solicitud y Encuesta al Apoderado'}
                 </button>
               </div>
             </form>
@@ -495,6 +779,34 @@ export default function Matriculas() {
           <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 mb-2">Solicitar Retiro de Estudiante</h3>
             <p className="text-xs text-gray-500 mb-4">La baja del estudiante requiere que el apoderado complete obligatoriamente el cuestionario confidencial de retiro. El alumno quedará en estado <strong>'Pendiente Retiro'</strong> hasta que el sistema reciba las respuestas.</p>
+
+            {matriculaSeleccionada && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 mb-4 text-xs space-y-2">
+                <div className="flex justify-between items-center pb-2 border-b border-rose-200">
+                  <span className="font-bold text-rose-900">Resumen de Baja:</span>
+                  <span className="px-2 py-0.5 bg-rose-200 text-rose-900 rounded font-semibold">Solicitud Retiro</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-rose-800">
+                  <div>
+                    <span className="text-rose-500 block text-[11px]">Estudiante:</span>
+                    <strong className="text-rose-950">{matriculaSeleccionada.estudiante_nombre}</strong>
+                    <div className="text-rose-600 font-mono text-[11px]">{matriculaSeleccionada.estudiante_rut}</div>
+                  </div>
+                  <div>
+                    <span className="text-rose-500 block text-[11px]">Curso Actual:</span>
+                    <strong className="text-rose-950">{matriculaSeleccionada.curso}</strong>
+                  </div>
+                  <div>
+                    <span className="text-rose-500 block text-[11px]">Apoderado Titular:</span>
+                    <span className="text-rose-900 font-medium">{formatearNombreCorto(matriculaSeleccionada.apoderado_nombre)}</span>
+                  </div>
+                  <div>
+                    <span className="text-rose-500 block text-[11px]">Fecha Prevista:</span>
+                    <span className="font-bold text-rose-950">{fechaRetiro || 'Por seleccionar'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={confirmarRetiro} className="space-y-4">
               <div>
@@ -544,6 +856,17 @@ export default function Matriculas() {
         abierto={modalExcelAbierto}
         onCerrar={() => setModalExcelAbierto(false)}
         colegioSeleccionado={colegioSeleccionado || ''}
+      />
+
+      <ModalDetalleMotivo
+        isOpen={modalDetalleMotivoAbierto}
+        onClose={() => setModalDetalleMotivoAbierto(false)}
+        idMatricula={idMatriculaDetalleMotivo}
+        modoInicial={modoDetalleMotivo}
+        onAbrirCertificado={(id, tipo) => {
+          setModalDetalleMotivoAbierto(false);
+          abrirModalEmision(id, tipo);
+        }}
       />
     </div>
   );

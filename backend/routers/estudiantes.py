@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from typing import Optional
 from pydantic import BaseModel
-from security import obtener_usuario_actual, verificar_escritura
+from security import obtener_usuario_actual, verificar_escritura, es_usuario_slep
 
 from services import estudiante_service
 from services.storage_service import validar_tamano_archivo
@@ -134,17 +134,31 @@ def obtener_estudiantes(
     q: Optional[str] = None, 
     establecimiento_id: Optional[int] = None, 
     buscar_global: Optional[bool] = False,
+    page: int = 1,
+    page_size: int = 50,
+    anio: Optional[int] = None,
+    codigo: Optional[int] = None,
+    curso: Optional[str] = None,
+    estado: Optional[str] = None,
     usuario_actual: dict = Depends(obtener_usuario_actual)
 ):
-    rol = usuario_actual.get("rol")
-    if rol in ["Colegio", "Visualizador_Colegio"] and not buscar_global:
+    if not es_usuario_slep(usuario_actual) and not buscar_global:
         establecimiento_id = usuario_actual.get("id_establecimiento")
+    elif not buscar_global and establecimiento_id is not None:
+        establecimiento_id = establecimiento_id
     elif buscar_global:
         establecimiento_id = None
         
-    if q:
-        return estudiante_service.buscar_estudiantes_db(q, establecimiento_id)
-    return estudiante_service.obtener_estudiantes_db(establecimiento_id, rol)
+    return estudiante_service.obtener_estudiantes_db(
+        establecimiento_id=establecimiento_id,
+        q=q,
+        page=page,
+        page_size=page_size,
+        anio=anio,
+        codigo=codigo,
+        curso=curso,
+        estado=estado
+    )
 
 @router.get("/apoderado/buscar/{rut_apoderado}")
 def buscar_apoderado(rut_apoderado: str, usuario_actual: dict = Depends(obtener_usuario_actual)):
@@ -152,7 +166,7 @@ def buscar_apoderado(rut_apoderado: str, usuario_actual: dict = Depends(obtener_
 
 @router.get("/{rut}")
 def obtener_ficha_estudiante(rut: str, usuario_actual: dict = Depends(obtener_usuario_actual)):
-    return estudiante_service.obtener_ficha_estudiante_db(rut)
+    return estudiante_service.obtener_ficha_estudiante_db(rut, usuario_actual)
 
 @router.post("")
 def crear_estudiante(payload: CrearEstudianteRequest, usuario_actual: dict = Depends(verificar_escritura)):
@@ -161,7 +175,7 @@ def crear_estudiante(payload: CrearEstudianteRequest, usuario_actual: dict = Dep
 @router.put("/{rut}")
 def actualizar_datos_estudiante(rut: str, req: ActualizarEstudianteRequest, usuario_actual: dict = Depends(verificar_escritura)):
     id_usuario = usuario_actual.get("id_usuario")
-    return estudiante_service.actualizar_datos_estudiante_db(rut, req, id_usuario)
+    return estudiante_service.actualizar_datos_estudiante_db(rut, req, id_usuario, usuario_actual)
 
 @router.post("/{rut}/documento-tutor")
 async def subir_documento_tutor(

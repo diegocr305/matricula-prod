@@ -22,7 +22,58 @@ from services.email_service import (
 from services.utils import determinar_nivel_backend
 from services import storage_service
 from services.establecimientos_service import obtener_capacidad_curso
+import unicodedata
 import re
+
+def normalizar_texto_curso(t: str) -> str:
+    if not t: return ''
+    nfkd = unicodedata.normalize('NFKD', str(t))
+    return ''.join([c for c in nfkd if not unicodedata.combining(c)]).lower().strip()
+
+def obtener_rango_curso(curso_str: str, nivel_str: str = None, cod_grado: int = None, cod_tipo: int = None) -> int:
+    c = normalizar_texto_curso(curso_str)
+    n = normalizar_texto_curso(nivel_str)
+
+    # 1. Parvularia
+    if 'sala cuna' in c: return 10
+    if 'medio menor' in c: return 20
+    if 'medio mayor' in c: return 30
+    if 'pre-kinder' in c or 'prekinder' in c or '1er nivel de transicion' in c or '1er nivel transicion' in c: return 40
+    if 'kinder' in c or '2do nivel de transicion' in c or '2do nivel transicion' in c: return 50
+    if 'parvul' in n or 'transicion' in n: return 40
+
+    # 2. Especial / Laboral
+    if 'laboral' in c or 'taller' in c:
+        m = re.search(r'(\d+)', c)
+        grado = int(m.group(1)) if m else (cod_grado or 1)
+        return 250 + grado
+
+    # 3. Adultos
+    if '1er nivel (1' in c or ('1er nivel' in c and 'medio' in c): return 202
+    if '2do nivel (3' in c or ('2do nivel' in c and 'medio' in c): return 204
+    if '3er nivel (4' in c or ('3er nivel' in c and 'medio' in c): return 204
+    if 'nivel basico 1' in c: return 104
+    if 'nivel basico 2' in c: return 106
+    if 'nivel basico 3' in c: return 108
+
+    # 4. Media regular
+    if 'medio' in c or 'media' in c or 'media' in n:
+        m = re.search(r'(\d+)', c)
+        grado = int(m.group(1)) if m else (cod_grado or 1)
+        return 200 + grado
+
+    # 5. Basica regular
+    if 'basico' in c or 'basica' in c or 'basica' in n or 'basic' in n:
+        m = re.search(r'(\d+)', c)
+        grado = int(m.group(1)) if m else (cod_grado or 1)
+        return 100 + grado
+
+    if cod_grado:
+        if 'med' in n: return 200 + cod_grado
+        if 'bas' in n: return 100 + cod_grado
+        return 100 + cod_grado
+
+    return 0
 
 def formatear_nivel_curso(curso_str: str) -> str:
     texto = (curso_str or "").upper()
@@ -54,24 +105,6 @@ def formatear_nombre_apoderado_resumido(nombres: str, apellido_paterno: str) -> 
     resultado = f"{primer_nombre} {primer_apellido}".strip()
     return resultado if resultado else "Pendiente"
 
-def obtener_anios_disponibles_db(establecimiento_id: int = None):
-    """Lista de años con datos + el año por defecto, para poblar el selector del frontend."""
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        if establecimiento_id is not None:
-            cur.execute(
-                "SELECT DISTINCT anio_escolar FROM matricula WHERE id_establecimiento = %s ORDER BY anio_escolar DESC",
-                (establecimiento_id,),
-            )
-        else:
-            cur.execute("SELECT DISTINCT anio_escolar FROM matricula ORDER BY anio_escolar DESC")
-        anios = [f[0] for f in cur.fetchall()]
-        return {"anios": anios, "por_defecto": anios[0] if anios else None}
-    finally:
-        cur.close()
-        conn.close()
-
 def obtener_todas_matriculas_db(
     establecimiento_id: int = None,
     page: int = 1,
@@ -80,6 +113,7 @@ def obtener_todas_matriculas_db(
     busqueda: str = None,
     curso: str = None,
     codigo: int = None,
+    estado: str = None,
 ):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -111,6 +145,25 @@ def obtener_todas_matriculas_db(
             base_where += " AND m.curso = %s"
             parametros.append(curso)
 
+        if estado and estado.strip():
+            est_clean = estado.strip().lower()
+            if est_clean in ['inactiva', 'retirado', 'retirada', 'inactivo']:
+                base_where += " AND (m.estado IN ('Inactiva', 'Retirado', 'Retirada', 'Inactivo') OR m.fecha_retiro IS NOT NULL)"
+            elif est_clean in ['traslado', 'traslados', 'trasladado', 'trasladados']:
+                base_where += " AND (m.motivo_retiro ILIKE '%%Traslado%%' OR m.observaciones ILIKE '%%traslado%%')"
+            elif est_clean in ['pendiente_traslado']:
+                base_where += " AND m.motivo_cambio_curso LIKE %s"
+                parametros.append("PENDIENTE_TRASLADO%")
+            elif est_clean in ['pendiente retiro', 'pendiente_retiro']:
+                base_where += " AND m.estado = %s"
+                parametros.append("Pendiente Retiro")
+            elif est_clean in ['activa', 'activo']:
+                base_where += " AND m.estado = %s AND m.fecha_retiro IS NULL"
+                parametros.append("Activa")
+            else:
+                base_where += " AND m.estado = %s"
+                parametros.append(estado.strip())
+
         if busqueda and busqueda.strip():
             tokens = busqueda.strip().split()
             for token in tokens:
@@ -135,7 +188,8 @@ def obtener_todas_matriculas_db(
                    m.anio_escolar, cte.descripcion, est.rbd, m.cod_tipo_ensenanza, m.id_establecimiento,
                    m.es_excedente, m.numero_resolucion_excedente, m.fecha_resolucion_excedente, m.ruta_documento_resolucion,
                    m.motivo_cambio_curso, m.estado_renovacion,
-                   asup.rut_pasaporte, asup.nombres, asup.apellido_paterno
+                   asup.rut_pasaporte, asup.nombres, asup.apellido_paterno,
+                   m.ruta_documento_traslado, m.motivo_retiro, m.fecha_retiro, m.observaciones
             {base_where}
             ORDER BY m.id_matricula DESC
             LIMIT %s OFFSET %s
@@ -155,7 +209,11 @@ def obtener_todas_matriculas_db(
             "motivo_cambio_curso": f[21],
             "estado_renovacion": f[22],
             "suplente_rut": f[23] or None,
-            "suplente_nombre": formatear_nombre_apoderado_resumido(f[24], f[25]) if f[23] else None
+            "suplente_nombre": formatear_nombre_apoderado_resumido(f[24], f[25]) if f[23] else None,
+            "ruta_documento_traslado": f[26],
+            "motivo_retiro": f[27],
+            "fecha_retiro": str(f[28]) if f[28] else None,
+            "observaciones": f[29]
         } for f in cur.fetchall()]
 
         import math
@@ -164,7 +222,7 @@ def obtener_todas_matriculas_db(
             "total": total,
             "page": page,
             "page_size": page_size,
-            "total_pages": math.ceil(total / page_size) if page_size > 0 else 1,
+            "total_pages": max(1, math.ceil(total / page_size)) if page_size > 0 else 1,
         }
     finally:
         cur.close()
@@ -303,6 +361,63 @@ def obtener_ruta_documento_resolucion_db(id_matricula: int, usuario_actual: dict
         cur.close()
         conn.close()
 
+def guardar_documento_traslado_db(id_matricula: int, archivo_bytes: bytes, filename: str, usuario_actual: dict):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id_establecimiento FROM matricula WHERE id_matricula = %s", (id_matricula,))
+        mat = cur.fetchone()
+        if not mat:
+            raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
+        
+        # Validar permisos
+        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+            id_est_user = usuario_actual.get("id_establecimiento")
+            if id_est_user and mat[0] != id_est_user:
+                raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta matrícula.")
+
+        ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
+        if ext not in [".pdf", ".jpg", ".jpeg", ".png"]:
+            ext = ".pdf"
+            
+        clave = f"traslados/cert_traslado_mat_{id_matricula}_{uuid.uuid4().hex[:8]}{ext}"
+        storage_service.guardar_archivo(archivo_bytes, clave, content_type="application/pdf")
+
+        cur.execute("UPDATE matricula SET ruta_documento_traslado = %s WHERE id_matricula = %s", (clave, id_matricula))
+        conn.commit()
+        return {"mensaje": "Certificado de traslado guardado exitosamente.", "ruta": clave}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al guardar certificado de traslado: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+def obtener_ruta_documento_traslado_db(id_matricula: int, usuario_actual: dict) -> str:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id_establecimiento, ruta_documento_traslado FROM matricula WHERE id_matricula = %s", (id_matricula,))
+        mat = cur.fetchone()
+        if not mat:
+            raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
+
+        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+            id_est_user = usuario_actual.get("id_establecimiento")
+            if id_est_user and mat[0] != id_est_user:
+                raise HTTPException(status_code=403, detail="No tiene permisos para consultar esta matrícula.")
+
+        if not mat[1]:
+            raise HTTPException(status_code=404, detail="Esta matrícula no tiene un certificado de traslado adjunto.")
+
+        return mat[1]
+    finally:
+        cur.close()
+        conn.close()
+
 
 def crear_nueva_matricula_db(matricula):
     conn = get_db_connection()
@@ -311,6 +426,39 @@ def crear_nueva_matricula_db(matricula):
         # Bloqueo a nivel de transacción para prevenir carreras concurrentes en el mismo curso/colegio/año
         clave_bloqueo = f"{matricula.id_establecimiento}-{matricula.anio_escolar}-{matricula.curso}"
         cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (clave_bloqueo,))
+
+        # 0. Obtener datos del colegio de destino
+        cursor.execute("SELECT id_establecimiento, nombre, rbd FROM establecimiento WHERE id_establecimiento = %s", (matricula.id_establecimiento,))
+        est_dest_row = cursor.fetchone()
+        nombre_est_dest = est_dest_row[1] if est_dest_row else f"Establecimiento #{matricula.id_establecimiento}"
+        rbd_est_dest = est_dest_row[2] if est_dest_row else ""
+
+        # 1. Validar antecedentes del estudiante: no permitir matricular en un curso inferior al ya cursado
+        cursor.execute("""
+            SELECT m.id_matricula, m.curso, m.nivel_ensenanza, m.cod_grado, m.anio_escolar, m.estado,
+                   m.id_establecimiento, est.nombre, est.rbd, m.fecha_retiro, m.observaciones
+            FROM matricula m
+            LEFT JOIN establecimiento est ON m.id_establecimiento = est.id_establecimiento
+            WHERE m.id_estudiante = %s AND m.estado != 'Anulada'
+            ORDER BY m.anio_escolar DESC, m.fecha_matricula DESC NULLS LAST, m.id_matricula DESC
+        """, (matricula.id_estudiante,))
+        matriculas_previas = cursor.fetchall()
+
+        rank_solicitado = obtener_rango_curso(
+            matricula.curso, 
+            getattr(matricula, 'nivel_ensenanza', None), 
+            getattr(matricula, 'cod_grado', None)
+        )
+
+        for mp in matriculas_previas:
+            rank_prev = obtener_rango_curso(mp[1], mp[2], mp[3])
+            # Si el curso solicitado es de un grado/nivel estrictamente inferior al ya cursado
+            if rank_solicitado > 0 and rank_prev > 0 and rank_solicitado < rank_prev:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No está permitido matricular al estudiante en un curso inferior al ya cursado. "
+                           f"El estudiante ya tiene registro en '{mp[1]}' (Año {mp[4]}), por lo que no puede descender a '{matricula.curso}'."
+                )
 
         cursor.execute("""
             SELECT COALESCE(MAX(numero_correlativo), 0) 
@@ -321,16 +469,88 @@ def crear_nueva_matricula_db(matricula):
         max_correlativo = cursor.fetchone()[0]
         nuevo_correlativo = max_correlativo + 1
 
-        cursor.execute("""
-            UPDATE matricula 
-            SET estado = 'Anulada', 
-                observaciones = CASE 
-                    WHEN observaciones IS NULL OR observaciones = '' THEN 'Anulada automáticamente por registro de nueva matrícula.'
-                    ELSE CONCAT(observaciones, ' | Anulada automáticamente por registro de nueva matrícula.')
-                END
-            WHERE id_estudiante = %s AND anio_escolar = %s AND estado = 'Activa'
-        """, (matricula.id_estudiante, matricula.anio_escolar))
+        # Acumulador de observaciones para la nueva matrícula
+        obs_acumuladas_nueva = []
+        if getattr(matricula, 'observaciones', None):
+            obs_acumuladas_nueva.append(matricula.observaciones.strip())
 
+        # 2. Procesamiento de matrículas previas:
+        # A) Mismo año escolar (Intra-anual)
+        for mp in matriculas_previas:
+            mp_id = mp[0]
+            mp_curso = mp[1]
+            mp_anio = mp[4]
+            mp_estado = mp[5]
+            mp_id_est = mp[6]
+            mp_nombre_est = mp[7] or f"Establecimiento #{mp_id_est}"
+            mp_rbd = mp[8] or "Sin RBD"
+
+            if mp_anio == matricula.anio_escolar and mp_estado in ('Activa', 'Pendiente Retiro', 'Pendiente Firma'):
+                if mp_id_est != matricula.id_establecimiento:
+                    # TRASPASO INTERCOLEGIO en el mismo año: el colegio de origen queda Retirado por Traslado
+                    obs_origen = f"Retirado por traslado hacia {nombre_est_dest} (RBD: {rbd_est_dest})."
+                    cursor.execute("""
+                        UPDATE matricula 
+                        SET estado = 'Retirado',
+                            motivo_retiro = 'Traslado a otro establecimiento',
+                            fecha_retiro = COALESCE(fecha_retiro, %s),
+                            observaciones = CASE 
+                                WHEN observaciones IS NULL OR observaciones = '' THEN %s
+                                ELSE CONCAT(observaciones, ' | ', %s)
+                            END
+                        WHERE id_matricula = %s
+                    """, (matricula.fecha_matricula, obs_origen, obs_origen, mp_id))
+
+                    obs_nueva = f"Incorporado por traslado desde {mp_nombre_est} (RBD: {mp_rbd}) en fecha {matricula.fecha_matricula}."
+                    obs_acumuladas_nueva.append(obs_nueva)
+                else:
+                    # Reasignación dentro del mismo colegio: Anulada
+                    obs_origen = "Anulada automáticamente por reasignación de curso en el mismo establecimiento."
+                    cursor.execute("""
+                        UPDATE matricula 
+                        SET estado = 'Anulada', 
+                            observaciones = CASE 
+                                WHEN observaciones IS NULL OR observaciones = '' THEN %s
+                                ELSE CONCAT(observaciones, ' | ', %s)
+                            END
+                        WHERE id_matricula = %s
+                    """, (obs_origen, obs_origen, mp_id))
+
+            # B) Si el estudiante se matricula en un año posterior:
+            elif mp_estado in ('Activa', 'Promovido', 'Repitente') and matricula.anio_escolar > mp_anio:
+                rank_prev = obtener_rango_curso(mp_curso, mp[2], mp[3])
+                es_mismo_colegio = (mp_id_est == matricula.id_establecimiento)
+                destino_txt = f"{nombre_est_dest} (RBD: {rbd_est_dest})" if not es_mismo_colegio else "el mismo establecimiento"
+
+                if rank_solicitado == rank_prev:
+                    # Alumno repitió el curso
+                    obs_repitente_orig = f"Alumno repitente: matriculado en {destino_txt} para el año {matricula.anio_escolar}."
+                    cursor.execute("""
+                        UPDATE matricula
+                        SET estado = 'Repitente',
+                            observaciones = CASE
+                                WHEN observaciones IS NULL OR observaciones = '' THEN %s
+                                ELSE CONCAT(observaciones, ' | ', %s)
+                            END
+                        WHERE id_matricula = %s
+                    """, (obs_repitente_orig, obs_repitente_orig, mp_id))
+                    if not es_mismo_colegio:
+                        obs_acumuladas_nueva.append(f"Matrícula de continuidad académica (Repitente) proveniente de {mp_nombre_est} (RBD: {mp_rbd}).")
+                elif rank_solicitado > rank_prev:
+                    # Alumno promovido al nivel superior
+                    obs_promovido_orig = f"Promovido al curso superior en {destino_txt} para el año {matricula.anio_escolar}."
+                    cursor.execute("""
+                        UPDATE matricula
+                        SET estado = 'Promovido',
+                            observaciones = CASE
+                                WHEN observaciones IS NULL OR observaciones = '' THEN %s
+                                ELSE CONCAT(observaciones, ' | ', %s)
+                            END
+                        WHERE id_matricula = %s AND estado = 'Activa'
+                    """, (obs_promovido_orig, obs_promovido_orig, mp_id))
+                    if not es_mismo_colegio:
+                        obs_acumuladas_nueva.append(f"Matrícula proveniente de {mp_nombre_est} (RBD: {mp_rbd}).")
+                break
 
         es_practica = getattr(matricula, 'es_alumno_practica', False)
         es_excedente = getattr(matricula, 'es_excedente', False)
@@ -338,6 +558,8 @@ def crear_nueva_matricula_db(matricula):
         fecha_res = getattr(matricula, 'fecha_resolucion_excedente', None)
         if fecha_res == "":
             fecha_res = None
+        ruta_traslado = getattr(matricula, 'ruta_documento_traslado', None)
+        obs_final = " | ".join(obs_acumuladas_nueva) if obs_acumuladas_nueva else None
 
         query = """
             INSERT INTO matricula (
@@ -346,25 +568,32 @@ def crear_nueva_matricula_db(matricula):
                 cod_tipo_ensenanza, cod_grado, letra_curso, id_usuario_ejecutor,
                 es_excedente, numero_resolucion_excedente, fecha_resolucion_excedente,
                 es_alumno_practica,
-                opcion_religion, acepta_compromiso, autoriza_entrevista, autoriza_imagen, metodo_firma, estado_firma
+                opcion_religion, acepta_compromiso, autoriza_entrevista, autoriza_imagen, metodo_firma, estado_firma,
+                observaciones, ruta_documento_traslado
             ) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente') RETURNING id_matricula;
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s, %s) 
+            RETURNING id_matricula;
         """
         valores = (
             nuevo_correlativo, matricula.anio_escolar, matricula.id_estudiante, 
             matricula.id_establecimiento, matricula.fecha_matricula, matricula.nivel_ensenanza, 
-            matricula.curso, getattr(matricula, 'estado', 'Activa'), 
+            matricula.curso, getattr(matricula, 'estado', 'Activa') or 'Activa', 
             getattr(matricula, 'cod_tipo_ensenanza', None), getattr(matricula, 'cod_grado', None), 
             getattr(matricula, 'letra_curso', None), matricula.id_usuario_ejecutor,
-            es_excedente, num_resolucion, fecha_res,es_practica,matricula.opcion_religion, matricula.acepta_compromiso, 
+            es_excedente, num_resolucion, fecha_res, es_practica, matricula.opcion_religion, matricula.acepta_compromiso, 
             matricula.autoriza_entrevista, matricula.autoriza_imagen, 
-            matricula.metodo_firma       
+            matricula.metodo_firma,
+            obs_final,
+            ruta_traslado
         )
         cursor.execute(query, valores)
         nuevo_id = cursor.fetchone()[0]
         
         conn.commit()
         return {"mensaje": f"Matrícula creada. Se asignó automáticamente el folio #{nuevo_correlativo}.", "id_matricula": nuevo_id, "correlativo_asignado": nuevo_correlativo}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -456,7 +685,7 @@ def guardar_respuesta_cuestionario_db(id_matricula: int, payload):
                    e.nombres, e.apellido_paterno, e.apellido_materno, e.sexo,
                    m.fecha_retiro, m.motivo_cambio_curso, est.nombre, est.rbd,
                    a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno, e.domicilio,
-                   a.correo_electronico
+                   a.correo_electronico, m.observaciones, m.id_estudiante, m.id_establecimiento
             FROM matricula m 
             INNER JOIN estudiante e ON m.id_estudiante = e.id_estudiante 
             INNER JOIN establecimiento est ON m.id_establecimiento = est.id_establecimiento
@@ -472,7 +701,29 @@ def guardar_respuesta_cuestionario_db(id_matricula: int, payload):
         if run_bd != run_ingresado:
             raise HTTPException(status_code=401, detail="El RUT ingresado no coincide con el estudiante registrado.")
 
-        # Formalizar el retiro en la base de datos
+        # 1. Almacenar la respuesta confidencial en la tabla segura de encuestas
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS encuesta_retiro (
+                id_encuesta SERIAL PRIMARY KEY,
+                id_matricula INT NOT NULL REFERENCES matricula(id_matricula) ON DELETE CASCADE,
+                id_estudiante INT,
+                id_establecimiento INT,
+                fecha_respuesta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                respuestas_confidenciales TEXT
+            );
+        """)
+        cur.execute("""
+            INSERT INTO encuesta_retiro (id_matricula, id_estudiante, id_establecimiento, respuestas_confidenciales)
+            VALUES (%s, %s, %s, %s)
+        """, (id_matricula, datos[21], datos[22], payload.motivo_real))
+
+        # 2. Componer la observación pública formal sin filtrar las razones privadas del apoderado
+        obs_previa = datos[20] or ""
+        obs_limpia = re.sub(r'Solicitud de retiro iniciada.*?\.\s*', '', obs_previa).strip()
+        nota_retiro = "Retiro formalizado mediante cuestionario confidencial de apoderado."
+        obs_final = f"{obs_limpia} | {nota_retiro}".strip(" |") if obs_limpia else nota_retiro
+
+        # 3. Formalizar el retiro en la base de datos
         cur.execute("""
             UPDATE matricula 
             SET estado = 'Retirado', 
@@ -480,39 +731,43 @@ def guardar_respuesta_cuestionario_db(id_matricula: int, payload):
                 observaciones = %s,
                 fecha_retiro = COALESCE(fecha_retiro, CURRENT_DATE)
             WHERE id_matricula = %s
-        """, (payload.motivo_real, id_matricula))
-
-        # Generar Certificado Oficial de Retiro
-        nom_apod = f"{datos[15] or ''} {datos[16] or ''} {datos[17] or ''}".strip() or "Sin registro"
-        domicilio = datos[18] if datos[18] else "los registros del establecimiento"
-        f_retiro = datos[10] if datos[10] else datetime.now().strftime('%Y-%m-%d')
-        
-        datos_alumno = {
-            "folio": datos[1], "anio": datos[2], "nivel": datos[3], "curso": datos[4],
-            "fecha_matricula": datos[5], "rut": str(datos[0]).strip(),
-            "nombre_completo": f"{datos[6]} {datos[7]} {datos[8]}".strip(),
-            "sexo": datos[9], "estado": "Retirado", "fecha_retiro": f_retiro,
-            "motivo_cambio": datos[11], "nombre_colegio": datos[12], "rbd_colegio": datos[13],
-            "rut_apoderado": datos[14] if datos[14] else "Sin registro", 
-            "nombre_apoderado": nom_apod, "domicilio": domicilio
-        }
-
-        hash_base = f"{datos_alumno['rut']}-{id_matricula}-SLEP{datos_alumno['anio']}"
-        hash_corto = hashlib.sha256(hash_base.encode('utf-8')).hexdigest()[:6].upper()
-        codigo_verificacion = f"VLP-{id_matricula}-{hash_corto}"
-
-        pdf_buffer, _ = generar_certificado_pdf(datos_alumno, "RETIRO", codigo_verificacion)
-        pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else pdf_buffer.read()
-
-        correo_apoderado = datos[19]
-        if correo_apoderado:
-            enviar_correo_confirmacion_retiro(correo_apoderado, id_matricula, datos_alumno['nombre_completo'], pdf_bytes)
+        """, (obs_final, id_matricula))
 
         conn.commit()
-        return {"mensaje": "Cuestionario procesado exitosamente. El retiro del estudiante ha sido formalizado y se ha emitido el Certificado Oficial."}
     finally:
         cur.close()
         conn.close()
+
+    # Generar Certificado Oficial de Retiro y enviar correo FUERA de la transacción de base de datos
+    nom_apod = f"{datos[15] or ''} {datos[16] or ''} {datos[17] or ''}".strip() or "Sin registro"
+    domicilio = datos[18] if datos[18] else "los registros del establecimiento"
+    f_retiro = datos[10] if datos[10] else datetime.now().strftime('%Y-%m-%d')
+    
+    datos_alumno = {
+        "folio": datos[1], "anio": datos[2], "nivel": datos[3], "curso": datos[4],
+        "fecha_matricula": datos[5], "rut": str(datos[0]).strip(),
+        "nombre_completo": f"{datos[6]} {datos[7]} {datos[8]}".strip(),
+        "sexo": datos[9], "estado": "Retirado", "fecha_retiro": f_retiro,
+        "motivo_cambio": datos[11], "nombre_colegio": datos[12], "rbd_colegio": datos[13],
+        "rut_apoderado": datos[14] if datos[14] else "Sin registro", 
+        "nombre_apoderado": nom_apod, "domicilio": domicilio
+    }
+
+    hash_base = f"{datos_alumno['rut']}-{id_matricula}-SLEP{datos_alumno['anio']}"
+    hash_corto = hashlib.sha256(hash_base.encode('utf-8')).hexdigest()[:6].upper()
+    codigo_verificacion = f"VLP-{id_matricula}-{hash_corto}"
+
+    pdf_buffer, _ = generar_certificado_pdf(datos_alumno, "RETIRO", codigo_verificacion)
+    pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else pdf_buffer.read()
+
+    correo_apoderado = datos[19]
+    if correo_apoderado:
+        try:
+            enviar_correo_confirmacion_retiro(correo_apoderado, id_matricula, datos_alumno['nombre_completo'], pdf_bytes)
+        except Exception as mail_err:
+            print(f"Advertencia al enviar correo de confirmación de retiro: {mail_err}")
+
+    return {"mensaje": "Cuestionario procesado exitosamente. El retiro del estudiante ha sido formalizado y se ha emitido el Certificado Oficial."}
 
 def guardar_respuesta_cuestionario_curso_db(id_matricula: int, payload):
     """
@@ -579,7 +834,7 @@ def guardar_respuesta_cuestionario_curso_db(id_matricula: int, payload):
 
         rbd_colegio = datos[15]
         nivel_str = formatear_nivel_curso(nuevo_curso)
-        capacidad_maxima = obtener_capacidad_curso(rbd_colegio, anio_escolar, nivel_str)
+        capacidad_maxima = obtener_capacidad_curso(rbd_colegio, anio_escolar, nivel_str, cur=cur)
 
         if matriculados_activos >= capacidad_maxima:
             raise HTTPException(
@@ -603,37 +858,41 @@ def guardar_respuesta_cuestionario_curso_db(id_matricula: int, payload):
             WHERE id_matricula = %s
         """, (nuevo_cod, nuevo_curso, nuevo_correlativo, payload.motivo_real, obs_actualizada.strip(), id_matricula))
 
-        # Generar comprobante oficial de traslado
-        nombre_completo = f"{datos[7]} {datos[8]} {datos[9]}".strip()
-        nom_apod = f"{datos[17] or ''} {datos[18] or ''} {datos[19] or ''}".strip() or "Sin registro"
-        domicilio = datos[20] if datos[20] else "los registros del establecimiento"
-
-        datos_alumno = {
-            "folio": nuevo_correlativo, "anio": anio_escolar, "nivel": datos[22], "curso": nuevo_curso,
-            "fecha_matricula": datos[12], "rut": str(datos[0]).strip(),
-            "nombre_completo": nombre_completo,
-            "sexo": datos[10], "estado": datos[11], "fecha_retiro": datos[13],
-            "motivo_cambio": payload.motivo_real, "nombre_colegio": datos[14], "rbd_colegio": datos[15],
-            "rut_apoderado": datos[16] if datos[16] else "Sin registro", 
-            "nombre_apoderado": nom_apod, "domicilio": domicilio
-        }
-
-        hash_base = f"{datos_alumno['rut']}-{id_matricula}-SLEP{datos_alumno['anio']}"
-        hash_corto = hashlib.sha256(hash_base.encode('utf-8')).hexdigest()[:6].upper()
-        codigo_verificacion = f"VLP-{id_matricula}-{hash_corto}"
-
-        pdf_buffer, _ = generar_certificado_pdf(datos_alumno, "CAMBIO_CURSO", codigo_verificacion)
-        pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else pdf_buffer.read()
-
-        correo_apoderado = datos[21]
-        if correo_apoderado:
-            enviar_correo_confirmacion_cambio_curso(correo_apoderado, id_matricula, nombre_completo, nuevo_curso, pdf_bytes)
-
         conn.commit()
-        return {"mensaje": "Justificación recibida exitosamente. El cambio de curso ha sido aplicado y la constancia oficial fue emitida."}
     finally:
         cur.close()
         conn.close()
+
+    # Generar comprobante oficial de traslado y enviar correo FUERA de la transacción de base de datos
+    nombre_completo = f"{datos[7]} {datos[8]} {datos[9]}".strip()
+    nom_apod = f"{datos[17] or ''} {datos[18] or ''} {datos[19] or ''}".strip() or "Sin registro"
+    domicilio = datos[20] if datos[20] else "los registros del establecimiento"
+
+    datos_alumno = {
+        "folio": nuevo_correlativo, "anio": anio_escolar, "nivel": datos[22], "curso": nuevo_curso,
+        "fecha_matricula": datos[12], "rut": str(datos[0]).strip(),
+        "nombre_completo": nombre_completo,
+        "sexo": datos[10], "estado": datos[11], "fecha_retiro": datos[13],
+        "motivo_cambio": payload.motivo_real, "nombre_colegio": datos[14], "rbd_colegio": datos[15],
+        "rut_apoderado": datos[16] if datos[16] else "Sin registro", 
+        "nombre_apoderado": nom_apod, "domicilio": domicilio
+    }
+
+    hash_base = f"{datos_alumno['rut']}-{id_matricula}-SLEP{datos_alumno['anio']}"
+    hash_corto = hashlib.sha256(hash_base.encode('utf-8')).hexdigest()[:6].upper()
+    codigo_verificacion = f"VLP-{id_matricula}-{hash_corto}"
+
+    pdf_buffer, _ = generar_certificado_pdf(datos_alumno, "CAMBIO_CURSO", codigo_verificacion)
+    pdf_bytes = pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else pdf_buffer.read()
+
+    correo_apoderado = datos[21]
+    if correo_apoderado:
+        try:
+            enviar_correo_confirmacion_cambio_curso(correo_apoderado, id_matricula, nombre_completo, nuevo_curso, pdf_bytes)
+        except Exception as mail_err:
+            print(f"Advertencia al enviar correo de confirmación de cambio de curso: {mail_err}")
+
+    return {"mensaje": "Justificación recibida exitosamente. El cambio de curso ha sido aplicado y la constancia oficial fue emitida."}
 
 def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = None, background_tasks = None):
     conn = get_db_connection()
@@ -657,6 +916,22 @@ def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = Non
         if datos[1] != 'Activa': raise HTTPException(status_code=400, detail="El alumno debe estar activo.")
             
         id_establecimiento = datos[21]
+        curso_actual = datos[2] or ""
+
+        if req.nuevo_curso and req.nuevo_curso.strip().lower() == curso_actual.strip().lower():
+            raise HTTPException(
+                status_code=400, 
+                detail=f"El estudiante ya se encuentra matriculado en el curso '{curso_actual}'. Seleccione un curso distinto para el traslado."
+            )
+
+        rank_actual = obtener_rango_curso(curso_actual, datos[7])
+        rank_nuevo = obtener_rango_curso(req.nuevo_curso)
+        if rank_nuevo > 0 and rank_actual > 0 and rank_nuevo < rank_actual:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No está permitido cambiar al estudiante a un curso inferior al actual. "
+                       f"Curso actual: '{curso_actual}', curso solicitado: '{req.nuevo_curso}'."
+            )
 
         if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
             id_est_user = usuario_actual.get("id_establecimiento")
@@ -669,14 +944,14 @@ def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = Non
             FROM matricula 
             WHERE id_establecimiento = %s 
               AND anio_escolar = %s 
-              AND curso = %s 
+              AND TRIM(curso) = TRIM(%s) 
               AND estado = 'Activa'
         """, (id_establecimiento, datos[0], req.nuevo_curso))
         matriculados_activos = cur.fetchone()[0]
 
         rbd_colegio = datos[15]
         nivel_str = formatear_nivel_curso(req.nuevo_curso)
-        capacidad_maxima = obtener_capacidad_curso(rbd_colegio, datos[0], nivel_str)
+        capacidad_maxima = obtener_capacidad_curso(rbd_colegio, datos[0], nivel_str, cur=cur)
 
         if matriculados_activos >= capacidad_maxima:
             raise HTTPException(
@@ -712,6 +987,9 @@ def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = Non
         conn.commit()
         msg_exito = f"Solicitud de traslado hacia '{req.nuevo_curso}' registrada exitosamente. Se envió el formulario de justificación al apoderado. El cambio de curso se aplicará automáticamente en cuanto el apoderado complete la encuesta."
         return {"status": "success", "mensaje": mensaje_alerta if mensaje_alerta else msg_exito}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1103,6 +1381,77 @@ def obtener_opciones_filtro_excel(id_establecimiento: int = None):
         conn.close()
 
 
+def obtener_conteo_alumnos_por_curso_db(id_establecimiento: int, anio: int = None) -> dict:
+    """
+    Devuelve la cantidad de estudiantes activos por curso en un establecimiento y año escolar,
+    así como el RBD institucional.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT rbd FROM establecimiento WHERE id_establecimiento = %s", (id_establecimiento,))
+        row_est = cur.fetchone()
+        rbd = row_est[0] if row_est else None
+
+        if anio is None:
+            cur.execute("SELECT MAX(anio_escolar) FROM matricula WHERE id_establecimiento = %s", (id_establecimiento,))
+            row_max = cur.fetchone()
+            anio = row_max[0] if (row_max and row_max[0]) else datetime.now().year
+
+        cur.execute("""
+            SELECT curso, COUNT(*)
+            FROM matricula
+            WHERE id_establecimiento = %s 
+              AND anio_escolar = %s 
+              AND estado = 'Activa'
+            GROUP BY curso
+            ORDER BY curso ASC
+        """, (id_establecimiento, anio))
+        filas = cur.fetchall()
+        conteo = {r[0]: r[1] for r in filas if r[0]}
+
+        return {
+            "rbd": rbd,
+            "anio": anio,
+            "conteo": conteo
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+def obtener_estudiantes_curso_db(id_establecimiento: int, anio: int, curso: str) -> list:
+    """
+    Devuelve la nómina de estudiantes activos inscritos en un curso específico.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT m.id_matricula, m.numero_correlativo, e.nombres, e.apellido_paterno, e.apellido_materno, e.run_ipe
+            FROM matricula m
+            INNER JOIN estudiante e ON m.id_estudiante = e.id_estudiante
+            WHERE m.id_establecimiento = %s 
+              AND m.anio_escolar = %s 
+              AND TRIM(m.curso) = TRIM(%s)
+              AND m.estado = 'Activa'
+            ORDER BY m.numero_correlativo ASC, e.apellido_paterno ASC
+        """, (id_establecimiento, anio, curso))
+        filas = cur.fetchall()
+        return [
+            {
+                "id_matricula": r[0],
+                "numero_correlativo": r[1],
+                "nombre_completo": f"{r[2]} {r[3]} {r[4] or ''}".strip(),
+                "run": r[5]
+            }
+            for r in filas
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+
 def exportar_matriculas_excel_service(id_establecimiento: int = None, anio: str = None, codigo_plan: str = None, curso: str = None):
     """
     Extrae las matrículas con TODA la información disponible del alumno, apoderados
@@ -1355,4 +1704,209 @@ def exportar_matriculas_excel_service(id_establecimiento: int = None, anio: str 
     finally:
         cur.close()
         conn.close()
+
+def parsear_texto_motivo(texto: str):
+    if not texto:
+        return [], ""
+    
+    motivos = []
+    detalle = ""
+    
+    # Si contiene [Motivos ...]: o [Detalles ...]:
+    if "[Motivos" in texto or "[Detalles" in texto:
+        m_motivos = re.search(r"\[Motivos[^\]]*\]:\s*(.*?)(?=\n\s*\[Detalles|\Z)", texto, re.DOTALL | re.IGNORECASE)
+        if m_motivos:
+            bloque = m_motivos.group(1).strip()
+            for linea in bloque.splitlines():
+                l = re.sub(r'^[•\-\*\s]+', '', linea).strip()
+                if l:
+                    motivos.append(l)
+        
+        m_detalles = re.search(r"\[Detalles[^\]]*\]:\s*(.*)", texto, re.DOTALL | re.IGNORECASE)
+        if m_detalles:
+            detalle = m_detalles.group(1).strip()
+    else:
+        detalle = texto.strip()
+        
+    return motivos, detalle
+
+def parsear_traslado_info(motivo_cambio: str, observaciones: str):
+    curso_origen = None
+    folio_origen = None
+    
+    if motivo_cambio:
+        m1 = re.search(r"(?:desde|De)\s*['\"]([^'\"]+)['\"]", motivo_cambio, re.IGNORECASE)
+        if m1:
+            curso_origen = m1.group(1).strip()
+        m2 = re.search(r"Folio(?:\s+anterior)?:\s*#?(\d+)", motivo_cambio, re.IGNORECASE)
+        if m2:
+            try:
+                folio_origen = int(m2.group(1))
+            except Exception:
+                pass
+            
+    if not curso_origen and observaciones:
+        m3 = re.search(r"(?:desde|De)\s*['\"]([^'\"]+)['\"]", observaciones, re.IGNORECASE)
+        if m3:
+            curso_origen = m3.group(1).strip()
+    if not folio_origen and observaciones:
+        m4 = re.search(r"De\s*['\"][^'\"]+['\"]\s*\(Folio\s*#?(\d+)\)", observaciones, re.IGNORECASE)
+        if m4:
+            try:
+                folio_origen = int(m4.group(1))
+            except Exception:
+                pass
+        else:
+            m5 = re.search(r"Folio(?:\s+anterior)?:\s*#?(\d+)", observaciones, re.IGNORECASE)
+            if m5:
+                try:
+                    folio_origen = int(m5.group(1))
+                except Exception:
+                    pass
+            
+    return curso_origen, folio_origen
+
+def obtener_detalle_motivo_matricula_db(id_matricula: int, usuario_actual: dict = None):
+    """
+    Obtiene los motivos detallados de retiro (incluyendo respuestas confidenciales de la encuesta)
+    o de cambio de curso (traslado de sala con justificación), garantizando control de acceso por colegio.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT m.id_matricula, m.numero_correlativo, m.anio_escolar, m.nivel_ensenanza, m.curso,
+                   m.fecha_matricula, m.estado, m.fecha_retiro, m.motivo_retiro, m.motivo_cambio_curso,
+                   m.observaciones, m.id_establecimiento,
+                   e.id_estudiante, e.run_ipe, e.nombres, e.apellido_paterno, e.apellido_materno,
+                   est.nombre, est.rbd,
+                   a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno,
+                   a.correo_electronico, a.telefono
+            FROM matricula m
+            INNER JOIN estudiante e ON m.id_estudiante = e.id_estudiante
+            INNER JOIN establecimiento est ON m.id_establecimiento = est.id_establecimiento
+            LEFT JOIN apoderado a ON e.id_apoderado_principal = a.id_apoderado
+            WHERE m.id_matricula = %s
+        """, (id_matricula,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
+
+        id_establecimiento = row[11]
+        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+            id_est_user = usuario_actual.get("id_establecimiento")
+            if id_est_user and id_establecimiento != id_est_user:
+                raise HTTPException(status_code=403, detail="No tiene permisos para ver detalles de matrículas de otro establecimiento.")
+
+        # Consultar encuesta de retiro si existe
+        encuesta_row = None
+        try:
+            cur.execute("""
+                SELECT fecha_respuesta, respuestas_confidenciales
+                FROM encuesta_retiro
+                WHERE id_matricula = %s
+                ORDER BY id_encuesta DESC
+                LIMIT 1
+            """, (id_matricula,))
+            encuesta_row = cur.fetchone()
+        except Exception:
+            # En caso de que la tabla aún no exista en algún ambiente aislado
+            conn.rollback()
+
+        estado = row[6] or ""
+        fecha_retiro = row[7]
+        motivo_retiro = row[8]
+        motivo_cambio = row[9]
+        observaciones = row[10] or ""
+
+        # Retiro
+        aplica_retiro = (
+            estado.lower() in ["retirado", "retirada", "inactiva", "inactivo", "pendiente retiro"] 
+            or fecha_retiro is not None 
+            or bool(motivo_retiro)
+            or bool(encuesta_row)
+        )
+        
+        tiene_encuesta = False
+        fecha_encuesta = None
+        motivos_retiro = []
+        detalle_retiro = ""
+
+        if encuesta_row:
+            tiene_encuesta = True
+            fecha_encuesta = str(encuesta_row[0]) if encuesta_row[0] else None
+            motivos_retiro, detalle_retiro = parsear_texto_motivo(encuesta_row[1])
+        elif motivo_retiro:
+            motivos_retiro, detalle_retiro = parsear_texto_motivo(motivo_retiro)
+            if not detalle_retiro and motivo_retiro:
+                detalle_retiro = motivo_retiro
+
+        # Cambio de curso
+        curso_origen, folio_origen = parsear_traslado_info(motivo_cambio, observaciones)
+        aplica_cambio = (
+            (bool(motivo_cambio) and not motivo_cambio.startswith("PENDIENTE_TRASLADO"))
+            or bool(curso_origen)
+            or "traslado formalizado" in observaciones.lower()
+        )
+
+        motivos_cambio = []
+        detalle_cambio = ""
+        if motivo_cambio and not motivo_cambio.startswith("PENDIENTE_TRASLADO"):
+            motivos_cambio, detalle_cambio = parsear_texto_motivo(motivo_cambio)
+            if not detalle_cambio and not motivos_cambio:
+                detalle_cambio = motivo_cambio
+
+        nombre_est = f"{row[14] or ''} {row[15] or ''} {row[16] or ''}".strip()
+        nombre_apod = f"{row[20] or ''} {row[21] or ''} {row[22] or ''}".strip() or "Sin registro"
+
+        return {
+            "id_matricula": row[0],
+            "numero_correlativo": row[1],
+            "anio_escolar": row[2],
+            "nivel_ensenanza": row[3],
+            "curso": row[4],
+            "fecha_matricula": str(row[5]) if row[5] else None,
+            "estado": estado,
+            "estudiante": {
+                "id_estudiante": row[12],
+                "rut": row[13],
+                "nombre_completo": nombre_est,
+                "curso": row[4],
+                "nivel_ensenanza": row[3],
+                "establecimiento": row[17],
+                "rbd": row[18],
+                "id_establecimiento": id_establecimiento
+            },
+            "apoderado": {
+                "rut": row[19] or "Sin registro",
+                "nombre_completo": nombre_apod,
+                "correo": row[23] or "Sin registro",
+                "telefono": row[24] or "Sin registro"
+            },
+            "retiro": {
+                "aplica": aplica_retiro,
+                "fecha_retiro": str(fecha_retiro) if fecha_retiro else None,
+                "motivo_oficial": motivo_retiro or ("Respuesta Apoderado (Confidencial)" if tiene_encuesta else "Sin motivo registrado"),
+                "tiene_encuesta": tiene_encuesta,
+                "fecha_encuesta": fecha_encuesta,
+                "motivos_seleccionados": motivos_retiro,
+                "detalle_adicional": detalle_retiro,
+                "observaciones": observaciones
+            },
+            "cambio_curso": {
+                "aplica": aplica_cambio,
+                "curso_actual": row[4],
+                "curso_anterior": curso_origen,
+                "folio_actual": row[1],
+                "folio_anterior": folio_origen,
+                "motivo_crudo": motivo_cambio,
+                "motivos_seleccionados": motivos_cambio,
+                "detalle_adicional": detalle_cambio,
+                "observaciones": observaciones
+            }
+        }
+    finally:
+        cur.close()
+        conn.close()
+
 

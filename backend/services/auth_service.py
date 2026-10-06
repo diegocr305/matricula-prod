@@ -25,19 +25,7 @@ def login_tradicional_service(credenciales):
             raise HTTPException(status_code=401, detail="Credenciales incorrectas o usuario inactivo")
             
         rol_db = usuario_db[3]
-        rol_solicitado = credenciales.rol.upper() # Nos aseguramos de que venga en mayúsculas para comparar
-        
-        # LÓGICA FLEXIBLE DE ROLES: Permitimos que los visualizadores entren a sus respectivos portales
-        rol_valido = False
-        
-        if rol_solicitado == "SLEP" and rol_db in ["SLEP", "admin_slep", "Visualizador_SLEP"]:
-            rol_valido = True
-        elif (rol_solicitado == "COLEGIO" or rol_solicitado == "ESTABLECIMIENTO") and rol_db in ["Colegio", "Visualizador_Colegio"]:
-            rol_valido = True
-        elif rol_solicitado == rol_db.upper():
-            rol_valido = True
-
-        if not rol_valido:
+        if not _rol_valido_para_portal(credenciales.rol, rol_db):
             raise HTTPException(status_code=403, detail="No tienes permisos para acceder a este portal con tu perfil actual.")
 
         token = crear_token_acceso(
@@ -57,14 +45,14 @@ def login_tradicional_service(credenciales):
 
 def _rol_valido_para_portal(rol_solicitado, rol_db):
     """Valida que el rol almacenado permita entrar al portal solicitado."""
-    rol_solicitado = (rol_solicitado or "").upper()
-    if rol_solicitado == "SLEP" and rol_db in ["SLEP", "admin_slep", "Visualizador_SLEP"]:
-        return True
-    if rol_solicitado in ("COLEGIO", "ESTABLECIMIENTO") and rol_db in ["Colegio", "Visualizador_Colegio"]:
-        return True
-    if rol_solicitado == (rol_db or "").upper():
-        return True
-    return False
+    rol_sol = (rol_solicitado or "").strip().upper()
+    rol_bd = (rol_db or "").strip().lower()
+    
+    if rol_sol == "SLEP":
+        return rol_bd in ["slep", "admin_slep", "admin", "visualizador_slep"]
+    if rol_sol in ("COLEGIO", "ESTABLECIMIENTO"):
+        return rol_bd in ["colegio", "director", "visualizador_colegio", "establecimiento"]
+    return rol_sol == rol_bd.upper()
 
 
 def login_google_service(credenciales):
