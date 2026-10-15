@@ -60,13 +60,16 @@ sueltas en routers/hooks; usar los helpers (`es_slep`, `puede_escribir`,
   scripts de `crear_admins/` apuntan a una BD local de desarrollo, NO a producción.
 
 ## Accesos otorgados (oct 2026, correo del jefe)
-- **admin_slep** (nivel central, acceso total), en `usuario`: araceli.contreras,
+Los 11 correos son del **RBD 1520** (id_establecimiento=17), en `acceso_establecimiento`.
+**NADIE quedó como `admin_slep`**: "administrador" aquí significa administrador del
+colegio (rol `Colegio`), no del nivel central SLEP.
+- **Colegio** (admin del colegio, ve todo lo del 1520): tamar.rubina, analia.torres,
+  yasna.diaz, carolina.conchap (esta última es la Directora).
+- **Matriculador** (solo Matrículas + Estudiantes del 1520): araceli.contreras,
   daniela.aguilera, marta.villegas, angelica.zamora, mauricio.montero, maria.guerra,
-  daniel.gajardo (todos @slepvalparaiso.cl).
-- **Matriculador** RBD 1520 (id_establecimiento=17), en `acceso_establecimiento`:
-  tamar.rubina, analia.torres, yasna.diaz.
-- `carolina.conchap@slepvalparaiso.cl` sigue como **Director** (`Colegio`) del RBD 1520
-  (NO es matriculadora; aclarado por el dueño).
+  daniel.gajardo.
+- Historial: en el primer alta se interpretaron invertidos y como SLEP; se corrigió a
+  este reparto final (todos 1520, cero admin_slep) por aclaración del dueño.
 
 ## Configuración Google Cloud (GCP)
 - OAuth Client ID dedicado del sistema de matrículas: "SLEP Matrículas Web Client".

@@ -7,9 +7,9 @@ search_path al schema `matriculas`, igual que el backend real.
 
 Es IDEMPOTENTE (ON CONFLICT): se puede re-ejecutar sin duplicar.
 
-Reparto (correo del jefe, oct 2026):
-  - admin_slep (nivel central, acceso total)  -> tabla `usuario`, id_establecimiento NULL
-  - Matriculador (solo Matrículas + Estudiantes del RBD 1520) -> tabla `acceso_establecimiento`
+Reparto (correo del jefe, oct 2026): los 11 correos son del RBD 1520. CERO admin_slep.
+  - Colegio (admin del colegio, ve todo lo de su establecimiento) -> `acceso_establecimiento`
+  - Matriculador (solo Matrículas + Estudiantes del RBD 1520)      -> `acceso_establecimiento`
 
 Los que entran por Google NO llevan password_hash (lo gestiona el login Google,
 que hace UPSERT de acceso_establecimiento -> usuario en el primer ingreso).
@@ -36,20 +36,24 @@ if not DATABASE_URL:
 
 RBD_1520_ID = 17  # Liceo Bicentenario Marítimo de Valparaíso (verificado en BD)
 
-ADMINS_SLEP = [
-    ("araceli.contreras@slepvalparaiso.cl", "Araceli Contreras"),
-    ("daniela.aguilera@slepvalparaiso.cl", "Daniela Aguilera"),
-    ("marta.villegas@slepvalparaiso.cl", "Marta Villegas"),
-    ("angelica.zamora@slepvalparaiso.cl", "Angelica Zamora"),
-    ("mauricio.montero@slepvalparaiso.cl", "Mauricio Montero"),
-    ("maria.guerra@slepvalparaiso.cl", "Maria Guerra"),
-    ("daniel.gajardo@slepvalparaiso.cl", "Daniel Gajardo"),
-]
-
-MATRICULADORES_1520 = [
+# Reparto correcto (correo del jefe, oct 2026): los 11 son del RBD 1520. CERO admin_slep.
+#   Admin del colegio (rol 'Colegio'): ven todo lo de su establecimiento (incl. Panel/Asistencia).
+#   Matriculador: solo Matrículas y Estudiantes del establecimiento.
+ADMIN_COLEGIO_1520 = [
     "tamar.rubina@slepvalparaiso.cl",
     "analia.torres@slepvalparaiso.cl",
     "yasna.diaz@slepvalparaiso.cl",
+    "carolina.conchap@slepvalparaiso.cl",  # Directora del 1520
+]
+
+MATRICULADORES_1520 = [
+    "araceli.contreras@slepvalparaiso.cl",
+    "daniela.aguilera@slepvalparaiso.cl",
+    "marta.villegas@slepvalparaiso.cl",
+    "angelica.zamora@slepvalparaiso.cl",
+    "mauricio.montero@slepvalparaiso.cl",
+    "maria.guerra@slepvalparaiso.cl",
+    "daniel.gajardo@slepvalparaiso.cl",
 ]
 
 
@@ -59,20 +63,19 @@ def main():
     try:
         cur.execute(f"SET search_path TO {DB_SCHEMA}, public;")
 
-        # 1) Administradores SLEP -> usuario (NULL establecimiento, acceso total)
-        for correo, nombre in ADMINS_SLEP:
+        # 1) Administradores del colegio -> acceso_establecimiento (RBD 1520). Entran por Google.
+        for correo in ADMIN_COLEGIO_1520:
             cur.execute(
                 """
-                INSERT INTO usuario (email_institucional, nombre, rol, id_establecimiento, activo)
-                VALUES (%s, %s, 'admin_slep', NULL, true)
-                ON CONFLICT (email_institucional) DO UPDATE
+                INSERT INTO acceso_establecimiento (correo, id_establecimiento, rol, es_principal, activo)
+                VALUES (%s, %s, 'Colegio', false, true)
+                ON CONFLICT (correo, id_establecimiento) DO UPDATE
                   SET rol = EXCLUDED.rol,
-                      id_establecimiento = EXCLUDED.id_establecimiento,
                       activo = true;
                 """,
-                (correo, nombre),
+                (correo, RBD_1520_ID),
             )
-            print(f"  [admin_slep] {correo}")
+            print(f"  [Colegio (admin) @1520] {correo}")
 
         # 2) Matriculadores -> acceso_establecimiento (RBD 1520). Entran por Google.
         for correo in MATRICULADORES_1520:
