@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config/api';
+import { esSlep, puedeVerPestana } from '../../config/roles';
 
 export interface Establecimiento {
   id_establecimiento: number;
@@ -15,8 +16,11 @@ export const useLayout = () => {
   const usuarioString = localStorage.getItem('usuario');
   const usuario = usuarioString ? JSON.parse(usuarioString) : null;
 
-  const esPerfilGlobal = ['SLEP', 'admin_slep', 'Visualizador_SLEP'].includes(usuario?.rol);
-  const puedeVerAuditoria = ['admin_slep', 'SLEP'].includes(usuario?.rol);
+  const esPerfilGlobal = esSlep(usuario?.rol);
+  // Qué pestañas ve este rol (catálogo central en config/roles.ts)
+  const puedeVerPanel = puedeVerPestana(usuario?.rol, 'panel');
+  const puedeVerAsistencia = puedeVerPestana(usuario?.rol, 'asistencia');
+  const puedeVerAuditoria = puedeVerPestana(usuario?.rol, 'auditoria');
   const [colegioSeleccionado, setColegioSeleccionado] = useState<string>(
     !esPerfilGlobal ? String(usuario?.id_establecimiento) : ''
   );
@@ -58,6 +62,8 @@ export const useLayout = () => {
   return {
     usuario,
     esPerfilGlobal,
+    puedeVerPanel,
+    puedeVerAsistencia,
     puedeVerAuditoria,
     colegioSeleccionado, setColegioSeleccionado,
     busquedaFiltro, setBusquedaFiltro,

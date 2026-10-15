@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+import roles as roles_catalogo
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
@@ -45,11 +46,9 @@ def obtener_usuario_actual(
 def verificar_escritura(usuario_actual: dict = Depends(obtener_usuario_actual)):
     """
     Guardián que bloquea peticiones POST, PUT y DELETE para perfiles visualizadores.
+    Delega en el catálogo central de roles (roles.py).
     """
-    rol = str(usuario_actual.get("rol", "")).strip().lower()
-    roles_solo_lectura = ["visualizador_slep", "visualizador_colegio", "visualizador"]
-    
-    if rol in roles_solo_lectura:
+    if not roles_catalogo.puede_escribir(usuario_actual.get("rol")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Modo Visualizador: Su perfil no tiene permisos para realizar modificaciones en el sistema."
@@ -61,8 +60,7 @@ def es_usuario_slep(usuario_actual: dict) -> bool:
     """Retorna True si el usuario tiene rol institucional de nivel central (SLEP / admin)."""
     if not usuario_actual:
         return False
-    rol = str(usuario_actual.get("rol", "")).strip().lower()
-    return rol in ["slep", "admin_slep", "admin", "visualizador_slep"]
+    return roles_catalogo.es_slep(usuario_actual.get("rol"))
 
 
 def es_usuario_colegio(usuario_actual: dict) -> bool:
@@ -113,3 +111,22 @@ def verificar_acceso_estudiante_db(rut: str, usuario_actual: dict, cur) -> bool:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario sin establecimiento asignado.")
 
     return True
+
+
+def requiere_pestana(pestana: str):
+    """
+    Fábrica de dependencias FastAPI que bloquea el acceso a un endpoint si el rol
+    del usuario no tiene habilitada la pestaña/panel indicada en el catálogo (roles.py).
+
+    Uso:
+        @router.get("/estadisticas")
+        def ...(usuario_actual: dict = Depends(requiere_pestana(roles.TAB_PANEL))):
+    """
+    def _dep(usuario_actual: dict = Depends(obtener_usuario_actual)):
+        if not roles_catalogo.puede_ver_pestana(usuario_actual.get("rol"), pestana):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Su perfil no tiene acceso a este módulo del sistema."
+            )
+        return usuario_actual
+    return _dep

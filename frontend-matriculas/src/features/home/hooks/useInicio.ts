@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { puedeVerPestana } from '../../../config/roles';
 
 export const useInicio = () => {
   const [usuario, setUsuario] = useState<any>(null);
@@ -10,11 +11,15 @@ export const useInicio = () => {
     }
   }, []);
 
-  // 🌟 CAMBIO AQUÍ: Validación estricta solo para administradores SLEP
-  const puedeVerAuditoria = ['admin_slep', 'SLEP'].includes(usuario?.rol);
+  // Visibilidad de tarjetas según el catálogo central de roles (config/roles.ts).
+  const puedeVerPanel = puedeVerPestana(usuario?.rol, 'panel');
+  const puedeVerAsistencia = puedeVerPestana(usuario?.rol, 'asistencia');
+  const puedeVerAuditoria = puedeVerPestana(usuario?.rol, 'auditoria');
 
   return {
     usuario,
-    puedeVerAuditoria
+    puedeVerPanel,
+    puedeVerAsistencia,
+    puedeVerAuditoria,
   };
 };

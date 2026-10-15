@@ -4,7 +4,18 @@ import { FolderOpen, Users, Activity, PieChart, CalendarCheck, ArrowRight } from
 import { useInicio } from './hooks/useInicio';
 
 export default function Inicio() {
-  const { usuario, puedeVerAuditoria } = useInicio();
+  const { usuario, puedeVerPanel, puedeVerAsistencia, puedeVerAuditoria } = useInicio();
+
+  // Matrículas y Estudiantes son fijas (2). Sumamos las condicionales para el grid.
+  const totalTarjetas = 2 + [puedeVerPanel, puedeVerAsistencia, puedeVerAuditoria].filter(Boolean).length;
+  // Clases completas (Tailwind JIT no detecta strings interpolados).
+  const COLS_LG: Record<number, string> = {
+    2: 'lg:grid-cols-2',
+    3: 'lg:grid-cols-3',
+    4: 'lg:grid-cols-4',
+    5: 'lg:grid-cols-5',
+  };
+  const colsLg = COLS_LG[totalTarjetas] ?? 'lg:grid-cols-4';
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
@@ -24,8 +35,8 @@ export default function Inicio() {
         </div>
       </div>
 
-      {/* 🌟 GRID DINÁMICO: 5 columnas si es admin, 4 columnas si es colegio */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${puedeVerAuditoria ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+      {/* 🌟 GRID DINÁMICO: una columna por tarjeta visible según el rol */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${colsLg}`}>
 
         {/* 1. BOTÓN MATRÍCULAS */}
         <Link to="/matriculas" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-900 hover:shadow-lg transition-all flex flex-col overflow-hidden">
@@ -62,6 +73,7 @@ export default function Inicio() {
         </Link>
 
         {/* 3. BOTÓN DASHBOARD */}
+        {puedeVerPanel && (
         <Link to="/inicio" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-purple-600 hover:shadow-lg transition-all flex flex-col overflow-hidden">
           <div className="p-5 flex-1">
             <div className="w-11 h-11 bg-purple-50 text-purple-700 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -78,7 +90,10 @@ export default function Inicio() {
           </div>
         </Link>
 
+        )}
+
         {/* 4. BOTÓN ASISTENCIA */}
+        {puedeVerAsistencia && (
         <Link to="/asistencia" className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-700 hover:shadow-lg transition-all flex flex-col overflow-hidden">
           <div className="p-5 flex-1">
             <div className="w-11 h-11 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -94,6 +109,8 @@ export default function Inicio() {
             <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
+
+        )}
 
         {/* 5. BOTÓN AUDITORÍA (Oculto para colegios, visible para admin) */}
         {puedeVerAuditoria && (

@@ -23,16 +23,50 @@ El sistema tiene DOS vías de login, ambas emiten un **JWT propio** del backend
 5. Emite JWT con: `sub` (email), `id_usuario`, `rol`, `id_establecimiento`.
 
 ## Roles
-- `SLEP`, `admin_slep`, `Visualizador_SLEP` → portal "Administración Central (SLEP)". Ven todos los establecimientos.
-- `Colegio`, `Visualizador_Colegio` → portal "Establecimiento Educacional". Ven solo su `id_establecimiento`.
-- Los `Visualizador_*` son de solo lectura (guard `verificar_escritura` en `security.py`).
+
+### Catálogo central (FUENTE ÚNICA DE VERDAD)
+La definición de roles vive centralizada en **`backend/roles.py`** y su espejo
+**`frontend-matriculas/src/config/roles.ts`**. Toda comparación de rol se hace
+NORMALIZADA (minúsculas) para tolerar la mezcla histórica de capitalización en la
+BD (`Colegio` / `COLEGIO` / `Director`). NO volver a hardcodear listas de roles
+sueltas en routers/hooks; usar los helpers (`es_slep`, `puede_escribir`,
+`puede_ver_pestana` / `esSlep`, `puedeEscribir`, `puedeVerPestana`).
+
+| Rol | Alcance | Escribe | Pestañas que ve |
+|---|---|---|---|
+| `admin_slep` (Super Admin) | SLEP (todos) | Sí | Todas (incl. Auditoría, carga SIGE) |
+| `Visualizador_SLEP` | SLEP (todos) | No | Todas, solo lectura |
+| `Colegio` (Director/directivo) | Su establecimiento | Sí | Inicio, Matrículas, Estudiantes, Panel, Asistencia |
+| `Matriculador` | Su establecimiento | Sí | Inicio, Matrículas, Estudiantes (NO Panel ni Asistencia) |
+| `Visualizador_Colegio` | Su establecimiento | No | Inicio, Matrículas, Estudiantes, Panel, Asistencia (lectura) |
+| `Docente_Jefe` (futuro) | Su curso | Sí | Inicio, Matrículas, Estudiantes — requiere `id_curso` en `acceso_establecimiento` (steering 08) |
+
+- Alias legacy reconocidos: `SLEP`/`admin` → admin_slep; `Director`/`establecimiento` → Colegio.
+- `admin_slep` sin `id_establecimiento` (NULL) = ve todo el SLEP.
+- Guard de pestaña por endpoint: `Depends(requiere_pestana(roles.TAB_*))` en `security.py`
+  (aplicado hoy a dashboard y asistencia). En el frontend, `RutaPorRol` en `App.tsx`
+  bloquea acceso por URL directa a pestañas no habilitadas.
 
 ## Dar acceso a nuevos usuarios
-- **Director / funcionario de un colegio**: insertar en `matriculas.acceso_establecimiento`
-  (correo `@slepvalparaiso.cl`, `id_establecimiento`, `rol` = 'Colegio' o 'Visualizador_Colegio').
+- **Director / funcionario / matriculador de un colegio**: insertar en
+  `matriculas.acceso_establecimiento` (correo `@slepvalparaiso.cl`, `id_establecimiento`,
+  `rol` = 'Colegio' | 'Matriculador' | 'Visualizador_Colegio'). La constraint única es
+  compuesta **(correo, id_establecimiento)** (no solo correo), ojo con el ON CONFLICT.
   Los 65 directores ya se poblaron desde `slep_establecimientos.correo_director`.
-- **Administrador SLEP** (ve todo): insertar en `matriculas.usuario` con `rol='SLEP'` e
-  `id_establecimiento=NULL`.
+- **Administrador SLEP** (ve todo): insertar en `matriculas.usuario` con `rol='admin_slep'`
+  e `id_establecimiento=NULL`.
+- **Script de alta en lote** (producción, idempotente): `crear_admins/crear_usuarios_lote.py`
+  lee `backend/.env` (DATABASE_URL) y fija search_path a `matriculas`. OJO: los otros
+  scripts de `crear_admins/` apuntan a una BD local de desarrollo, NO a producción.
+
+## Accesos otorgados (oct 2026, correo del jefe)
+- **admin_slep** (nivel central, acceso total), en `usuario`: araceli.contreras,
+  daniela.aguilera, marta.villegas, angelica.zamora, mauricio.montero, maria.guerra,
+  daniel.gajardo (todos @slepvalparaiso.cl).
+- **Matriculador** RBD 1520 (id_establecimiento=17), en `acceso_establecimiento`:
+  tamar.rubina, analia.torres, yasna.diaz.
+- `carolina.conchap@slepvalparaiso.cl` sigue como **Director** (`Colegio`) del RBD 1520
+  (NO es matriculadora; aclarado por el dueño).
 
 ## Configuración Google Cloud (GCP)
 - OAuth Client ID dedicado del sistema de matrículas: "SLEP Matrículas Web Client".

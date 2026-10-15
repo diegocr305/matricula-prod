@@ -5,6 +5,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 from schemas import MatriculaCreate, MatriculaUpdate, CuestionarioRetiro
 from security import obtener_usuario_actual, verificar_escritura, validar_acceso_colegio
+import roles
 from services import matricula_service
 from services.matricula_service import exportar_matriculas_excel_service
 from services.storage_service import validar_tamano_archivo
@@ -44,16 +45,14 @@ def obtener_matriculas(
 
 @router.get("/anios-disponibles")
 def anios_disponibles(establecimiento_id: Optional[int] = None, usuario_actual: dict = Depends(obtener_usuario_actual)):
-    rol = usuario_actual.get("rol")
-    if rol in ["Colegio", "Visualizador_Colegio"]:
+    if not roles.es_slep(usuario_actual.get("rol")):
         establecimiento_id = usuario_actual.get("id_establecimiento")
     return matricula_service.obtener_anios_disponibles_db(establecimiento_id)
 
 @router.post("")
 def crear_matricula(matricula: MatriculaCreate, usuario_actual: dict = Depends(verificar_escritura)):
-    rol = usuario_actual.get("rol")
     id_est_usuario = usuario_actual.get("id_establecimiento")
-    if rol in ["Colegio", "Visualizador_Colegio"]:
+    if not roles.es_slep(usuario_actual.get("rol")):
         if id_est_usuario and matricula.id_establecimiento != id_est_usuario:
             raise HTTPException(
                 status_code=403, 
@@ -121,8 +120,7 @@ async def carga_masiva_sige(
     archivos: List[UploadFile] = File(...), 
     usuario_actual: dict = Depends(verificar_escritura)
 ):
-    rol = str(usuario_actual.get("rol", "")).lower()
-    if rol not in ["admin_slep", "slep", "admin"]:
+    if not roles.es_slep(usuario_actual.get("rol")):
         raise HTTPException(
             status_code=403, 
             detail="Acceso restringido: La carga masiva de SIGE está reservada exclusivamente para administradores o nivel central SLEP."

@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from typing import Optional
 from pydantic import BaseModel
 from security import obtener_usuario_actual, verificar_escritura, es_usuario_slep
+import roles
 
 from services import estudiante_service
 from services.storage_service import validar_tamano_archivo
@@ -121,8 +122,7 @@ def buscar_estudiantes(
     buscar_global: Optional[bool] = False,
     usuario_actual: dict = Depends(obtener_usuario_actual)
 ):
-    rol = usuario_actual.get("rol")
-    if rol in ["Colegio", "Visualizador_Colegio"] and not buscar_global:
+    if not es_usuario_slep(usuario_actual) and not buscar_global:
         establecimiento_id = usuario_actual.get("id_establecimiento")
     elif buscar_global:
         establecimiento_id = None

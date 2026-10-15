@@ -8,6 +8,8 @@ export default function Layout() {
   const {
     usuario,
     esPerfilGlobal,
+    puedeVerPanel,
+    puedeVerAsistencia,
     puedeVerAuditoria,
     colegioSeleccionado, setColegioSeleccionado,
     busquedaFiltro, setBusquedaFiltro,
@@ -53,13 +55,17 @@ export default function Layout() {
             <Link to="/estudiantes" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/estudiantes') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
               <Users size={18} /> Estudiantes
             </Link>
+            {puedeVerPanel && (
              <Link to="/inicio" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/inicio') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
               <PieChart size={18} /> Panel de Control
             </Link>
+            )}
 
+            {puedeVerAsistencia && (
             <Link to="/asistencia" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/asistencia') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
               <CalendarCheck size={18} /> Asistencia
             </Link>
+            )}
 
             {puedeVerAuditoria && (
               <Link to="/auditoria" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/auditoria') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>

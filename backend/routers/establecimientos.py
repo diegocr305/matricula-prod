@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, Form, HTTPException, File
 from security import obtener_usuario_actual, verificar_escritura
+import roles
 
 # Importamos la capa de servicio
 from services import establecimientos_service
@@ -23,8 +24,7 @@ async def cargar_capacidades(
     Recibe el Excel de Declaración de Cupos (DCV) y lo procesa.
     Restringido exclusivamente a administradores del SLEP.
     """
-    rol = usuario_actual.get("rol")
-    if rol not in ["admin_slep", "SLEP"]:
+    if not roles.es_slep(usuario_actual.get("rol")):
         raise HTTPException(
             status_code=403, 
             detail="Acceso restringido: Solo el nivel central (SLEP) puede cargar capacidades de oferta."

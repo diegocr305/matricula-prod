@@ -7,6 +7,7 @@ from google.auth.transport import requests as google_requests
 
 from database import get_db_connection
 from security import verificar_password, crear_token_acceso, ACCESS_TOKEN_EXPIRE_MINUTES
+import roles
 
 # Client ID de Google (Google Cloud Console -> Credentials). Se lee del entorno.
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -44,15 +45,20 @@ def login_tradicional_service(credenciales):
 
 
 def _rol_valido_para_portal(rol_solicitado, rol_db):
-    """Valida que el rol almacenado permita entrar al portal solicitado."""
+    """Valida que el rol almacenado permita entrar al portal solicitado.
+    Usa el catálogo central de roles (roles.py): el portal SLEP admite roles de
+    alcance nivel central; el portal Colegio/Establecimiento admite roles de
+    alcance establecimiento (Colegio, Matriculador, Docente_Jefe, visualizadores)."""
     rol_sol = (rol_solicitado or "").strip().upper()
-    rol_bd = (rol_db or "").strip().lower()
-    
+
+    if not roles.es_rol_valido(rol_db):
+        return False
     if rol_sol == "SLEP":
-        return rol_bd in ["slep", "admin_slep", "admin", "visualizador_slep"]
+        return roles.es_slep(rol_db)
     if rol_sol in ("COLEGIO", "ESTABLECIMIENTO"):
-        return rol_bd in ["colegio", "director", "visualizador_colegio", "establecimiento"]
-    return rol_sol == rol_bd.upper()
+        return not roles.es_slep(rol_db)
+    # Compatibilidad: si el portal coincide exactamente con el rol canónico/alias
+    return roles.canonico(rol_sol) is not None and roles.canonico(rol_sol) == roles.canonico(rol_db)
 
 
 def login_google_service(credenciales):

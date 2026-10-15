@@ -16,6 +16,19 @@ import EncuestaCambioCurso from '../features/matriculas/CuestionarioCambio';
 import PortalFirmaApoderado from '../features/matriculas/PortalFirmaAPoderado';
 import { ToastProvider } from '../components/Toast';
 import { esTokenExpirado, obtenerTiempoRestanteMs, cerrarSesionPorExpiracion } from '../utils/auth';
+import { puedeVerPestana, rolActual, type Pestana } from '../config/roles';
+
+// ============================================================================
+// GUARDIÁN POR ROL: bloquea el acceso por URL directa a una pestaña que el
+// rol no tiene habilitada (p. ej. un Matriculador escribiendo /inicio a mano).
+// La protección real de datos la hace el backend; esto evita la pantalla vacía.
+// ============================================================================
+const RutaPorRol = ({ pestana, children }: { pestana: Pestana; children: React.ReactNode }) => {
+  if (!puedeVerPestana(rolActual(), pestana)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
 
 // ============================================================================
 // COMPONENTE GUARDIÁN (Protección de Rutas y Expiración de Token)
@@ -78,14 +91,14 @@ export default function App() {
           {/* Todas estas rutas hijas heredan la protección del Layout */}
           
           <Route index element={<HomeMenu />} />
-          <Route path="inicio" element={<Estadisticas/>} />
+          <Route path="inicio" element={<RutaPorRol pestana="panel"><Estadisticas/></RutaPorRol>} />
           <Route path="/verificar" element={<Verificador />} />
           <Route path="matriculas" element={<Matriculas />} />
           <Route path="matriculas/nueva" element={<NuevaMatricula />} />
           <Route path="matriculas/confirmar-renovacion/:idMatricula" element={<ConfirmarRenovacion />} />
           <Route path="estudiantes" element={<Estudiantes />} />
-          <Route path="asistencia" element={<PanelAsistencia />} />
-          <Route path="auditoria" element={<Auditoria />} />
+          <Route path="asistencia" element={<RutaPorRol pestana="asistencia"><PanelAsistencia /></RutaPorRol>} />
+          <Route path="auditoria" element={<RutaPorRol pestana="auditoria"><Auditoria /></RutaPorRol>} />
           
         </Route>
 
