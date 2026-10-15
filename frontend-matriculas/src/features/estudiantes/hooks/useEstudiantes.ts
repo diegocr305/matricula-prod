@@ -252,9 +252,16 @@ export const useEstudiantes = () => {
       .then((data) => {
         setOpcionesFiltro(data);
         if (data.anios && data.anios.length > 0) {
-          const ultimoAnioRegistrado = String(data.anios[0]);
           if (!anioInicializadoRef.current) {
-            setFiltroAnio(ultimoAnioRegistrado);
+            // Por defecto, el AÑO EN CURSO (calendario). Si ese año aún no tiene
+            // datos cargados, caemos al año más reciente disponible. Así hoy
+            // muestra 2026 (los vigentes) y en enero 2027 cambia solo, sin tocar código.
+            const anioActual = String(new Date().getFullYear());
+            const aniosDisponibles = data.anios.map(String);
+            const anioPorDefecto = aniosDisponibles.includes(anioActual)
+              ? anioActual
+              : String(data.anios[0]);
+            setFiltroAnio(anioPorDefecto);
             anioInicializadoRef.current = true;
           }
         }
