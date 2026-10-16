@@ -959,34 +959,47 @@ def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = Non
                 detail=f"El curso '{req.nuevo_curso}' ha alcanzado su capacidad máxima ({matriculados_activos}/{capacidad_maxima} cupos). No es posible solicitar el traslado hacia un curso lleno."
             )
 
-        # Guardamos la solicitud de traslado como PENDIENTE sin mover aún al estudiante de curso.
-        # El cambio se efectúa cuando el apoderado complete la justificación obligatoria.
-        nueva_observacion = f"{datos[3] or ''}\n[{datetime.now().strftime('%Y-%m-%d')}] Solicitud de traslado hacia '{req.nuevo_curso}'. En espera de justificación obligatoria del apoderado."
-        motivo_provisional = f"PENDIENTE_TRASLADO|{req.cod_tipo_ensenanza}|{req.nuevo_curso}"
+        # CAMBIO DE CURSO DIRECTO (el establecimiento es testigo de fe; no requiere
+        # justificación del apoderado ni correo). Se aplica al instante:
+        # mueve el curso, asigna el folio nuevo de forma atómica, y registra el
+        # motivo opcional que indique el funcionario. Las validaciones de arriba
+        # (activo, año vigente, no regresión, capacidad) ya pasaron.
+        anio_escolar = datos[0]
+        folio_antiguo = datos[6]
+        nuevo_cod = req.cod_tipo_ensenanza
+        nuevo_curso = req.nuevo_curso
+        motivo = (getattr(req, "motivo_cambio_curso", None) or "").strip() or None
+
+        # Bloqueo atómico por curso/colegio/año para que el folio no colisione aunque
+        # dos funcionarios muevan alumnos al mismo curso a la vez.
+        clave_bloqueo = f"{id_establecimiento}-{anio_escolar}-{nuevo_curso}"
+        cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (clave_bloqueo,))
 
         cur.execute("""
-            UPDATE matricula 
-            SET observaciones = %s, motivo_cambio_curso = %s 
+            SELECT COALESCE(MAX(numero_correlativo), 0)
+            FROM matricula
+            WHERE id_establecimiento = %s AND anio_escolar = %s AND curso = %s
+        """, (id_establecimiento, anio_escolar, nuevo_curso))
+        nuevo_correlativo = cur.fetchone()[0] + 1
+
+        traza = (f"[{datetime.now().strftime('%Y-%m-%d')}] Cambio de curso aplicado por el "
+                 f"establecimiento: de '{curso_actual}' (Folio #{folio_antiguo}) a "
+                 f"'{nuevo_curso}' (Folio #{nuevo_correlativo})."
+                 + (f" Motivo: {motivo}" if motivo else ""))
+        nueva_observacion = f"{datos[3] or ''}\n{traza}".strip()
+
+        cur.execute("""
+            UPDATE matricula
+            SET cod_tipo_ensenanza = %s, curso = %s, numero_correlativo = %s,
+                motivo_cambio_curso = %s, observaciones = %s, estado = 'Activa'
             WHERE id_matricula = %s
-        """, (nueva_observacion.strip(), motivo_provisional, id_matricula))
-        
-        mensaje_alerta = ""
-        correo_ingresado = getattr(req, 'correo_destino', None)      
-        correo_apoderado = correo_ingresado if correo_ingresado else datos[5]  
-        nombre_alumno = datos[4]
-        
-        if correo_apoderado:
-            if background_tasks:
-                background_tasks.add_task(enviar_correo_solicitud_cambio_curso, correo_apoderado, id_matricula, nombre_alumno, req.nuevo_curso)
-            else:
-                exito, msg_error = enviar_correo_solicitud_cambio_curso(correo_apoderado, id_matricula, nombre_alumno, req.nuevo_curso)
-                if not exito: mensaje_alerta = f"⚠️ Solicitud registrada, pero falló el envío a Gmail: {msg_error}"
-        else:
-            mensaje_alerta = "⚠️ Solicitud registrada, pero el estudiante NO TIENE apoderado con correo registrado."
+        """, (nuevo_cod, nuevo_curso, nuevo_correlativo, motivo, nueva_observacion, id_matricula))
 
         conn.commit()
-        msg_exito = f"Solicitud de traslado hacia '{req.nuevo_curso}' registrada exitosamente. Se envió el formulario de justificación al apoderado. El cambio de curso se aplicará automáticamente en cuanto el apoderado complete la encuesta."
-        return {"status": "success", "mensaje": mensaje_alerta if mensaje_alerta else msg_exito}
+        return {
+            "status": "success",
+            "mensaje": f"Cambio de curso aplicado: el estudiante ahora está en '{nuevo_curso}' (Folio #{nuevo_correlativo}).",
+        }
     except HTTPException:
         conn.rollback()
         raise

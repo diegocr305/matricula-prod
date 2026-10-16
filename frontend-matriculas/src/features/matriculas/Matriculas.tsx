@@ -30,6 +30,7 @@ export default function Matriculas() {
     matriculaSeleccionada,
     manejarSubidaCSV, abrirModalEmision, iniciarRetiro, confirmarRetiro, 
     iniciarCambioCurso, confirmarCambioCurso,
+    motivoCambio, setMotivoCambio,
     mostrarCupos, cuposOcupados, capacidadSala, descargandoExcel, exportarAExcel,
     capacidadCursoDestino, cargandoCapacidadDestino, matriculadosCursoDestino, cursoDestinoLleno, cuposPorCurso,
     cursoActual, estudiantesCursoDestino, cargandoEstudiantesDestino, esMismoCurso,
@@ -557,10 +558,10 @@ export default function Matriculas() {
       {modalCursoAbierto && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Solicitar Traslado de Curso</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Cambio de Curso</h3>
             
             <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 text-xs text-blue-800">
-              <p><strong>Normativa SLEP:</strong> El traslado requiere la justificación obligatoria del apoderado mediante encuesta. Al confirmar, se enviará el formulario al apoderado y el cambio de sala se aplicará automáticamente en el sistema en cuanto el apoderado responda la justificación.</p>
+              <p><strong>El establecimiento es testigo de fe:</strong> el cambio de curso se aplica de inmediato al confirmar. Puede registrar un motivo (opcional) a modo de respaldo.</p>
             </div>
 
             {matriculaSeleccionada && (
@@ -732,18 +733,18 @@ export default function Matriculas() {
                 )}
               </div>
 
-              <div className="border-t pt-3 space-y-3">
-                <p className="text-xs font-bold text-gray-700 uppercase">3. Envío de Encuesta Obligatoria al Apoderado</p>
-                
-                <div className="p-2.5 border rounded-lg bg-gray-50 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-800">
-                    <input type="checkbox" checked={enviarApoderadoCurso} onChange={(e) => setEnviarApoderadoCurso(e.target.checked)} className="w-4 h-4 text-blue-600 rounded" />
-                    Enviar encuesta a correo del apoderado
-                  </label>
-                  {enviarApoderadoCurso && (
-                    <input type="email" placeholder="correo.apoderado@gmail.com" value={correoApoderadoCurso} onChange={(e) => setCorreoApoderadoCurso(e.target.value)} className="w-full border p-2 rounded text-xs bg-white" required />
-                  )}
-                </div>
+              <div className="border-t pt-3 space-y-2">
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  3. Motivo del cambio <span className="text-gray-400 font-medium normal-case">(opcional)</span>
+                </label>
+                <textarea
+                  value={motivoCambio}
+                  onChange={(e) => setMotivoCambio(e.target.value)}
+                  rows={2}
+                  placeholder="Ej: a petición del apoderado por cercanía de amistades / razones pedagógicas..."
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[11px] text-gray-400">Queda registrado como respaldo del cambio. No es obligatorio.</p>
               </div>
 
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
@@ -758,12 +759,12 @@ export default function Matriculas() {
                   }`}
                 >
                   {procesandoCurso 
-                    ? 'Procesando...' 
+                    ? 'Aplicando...' 
                     : esMismoCurso
                       ? 'Estudiante ya está en este curso'
                       : cursoDestinoLleno 
                         ? 'Curso sin cupos disponibles (Lleno)' 
-                        : 'Enviar Solicitud y Encuesta al Apoderado'}
+                        : 'Aplicar Cambio de Curso'}
                 </button>
               </div>
             </form>

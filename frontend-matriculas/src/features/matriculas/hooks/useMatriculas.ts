@@ -639,41 +639,29 @@ export const useMatriculas = () => {
       if (!seguro) return;
     }
 
-    const destinatarios: string[] = [];
-    if (enviarDirectorCurso && correoDirectorCurso.trim()) destinatarios.push(correoDirectorCurso.trim());
-    if (enviarApoderadoCurso && correoApoderadoCurso.trim()) destinatarios.push(correoApoderadoCurso.trim());
-
-    if (destinatarios.length === 0) {
-      toast.warning('Por cumplimiento normativo, debe indicar al menos un correo de destino para enviar el certificado de traslado.');
-      return;
-    }
-
     setProcesandoCurso(true);
     const token = localStorage.getItem('token');
 
     try {
+      // Cambio de curso DIRECTO: el establecimiento es testigo de fe. Se aplica al
+      // instante; el motivo es opcional (respaldo). No se envía correo al apoderado.
       const respuesta = await fetch(`${API_BASE_URL}/matriculas/${idSeleccionado}/curso`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           cod_tipo_ensenanza: parseInt(planDestino),
           nuevo_curso: cursoDestino,
-          motivo_cambio_curso: motivoCambio,
-          correo_destino: enviarApoderadoCurso ? correoApoderadoCurso.trim() : null
+          motivo_cambio_curso: (motivoCambio || '').trim() || null
         }),
       });
 
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.detail || 'Error al cambiar de curso');
 
-      if (descargarLocalCurso) {
-        window.open(`${API_BASE_URL}/matriculas/${idSeleccionado}/certificado?tipo=CAMBIO_CURSO&token=${token || ''}`, '_blank');
-      }
-
       setModalCursoAbierto(false);
       cargarMatriculas();
       cargarConteoCursos();
-      toast.success('Traslado registrado y certificado enviado con éxito.');
+      toast.success(datos.mensaje || 'Cambio de curso aplicado con éxito.');
 
     } catch (err: any) {
       toast.error('Error al cambiar de curso: ' + err.message);
@@ -787,6 +775,7 @@ export const useMatriculas = () => {
     enviarApoderadoCurso, setEnviarApoderadoCurso,
     correoApoderadoCurso, setCorreoApoderadoCurso,
     descargarLocalCurso, setDescargarLocalCurso,
+    motivoCambio, setMotivoCambio,
     advertenciaNivel,
     modalEmisionAbierto, setModalEmisionAbierto,
     datosEmision,
