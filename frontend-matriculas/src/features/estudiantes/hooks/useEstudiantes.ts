@@ -479,10 +479,18 @@ export const useEstudiantes = () => {
   };
 
   const handleGuardarEdicion = async () => {
-    // Validación: el domicilio del estudiante debe quedar en los campos correctos.
-    // Se exige al menos Calle y Comuna (el número puede faltar en sectores rurales).
-    if (!((datosEdicion.calle || '').trim()) || !((datosEdicion.comuna || '').trim())) {
-      toast.warning("Complete al menos la Calle y la Comuna del domicilio del estudiante.");
+    // Validación: el domicilio del estudiante debe quedar desglosado en los campos
+    // correctos. Calle, Número y Comuna son OBLIGATORIOS (Sector/Cerro es opcional).
+    if (!((datosEdicion.calle || '').trim())) {
+      toast.warning("La Calle del domicilio del estudiante es obligatoria.");
+      return;
+    }
+    if (!((datosEdicion.numero || '').trim())) {
+      toast.warning("El Número del domicilio del estudiante es obligatorio.");
+      return;
+    }
+    if (!((datosEdicion.comuna || '').trim())) {
+      toast.warning("La Comuna del domicilio del estudiante es obligatoria.");
       return;
     }
 

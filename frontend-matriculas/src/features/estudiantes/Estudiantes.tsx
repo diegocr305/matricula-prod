@@ -931,7 +931,7 @@ export default function Estudiantes() {
                           la calle en Calle, el número en Número, etc.
                         </p>
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Calle</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Calle <span className="text-red-500">*</span></label>
                           <input 
                             type="text" 
                             placeholder="Ej: Av. Brasil" 
@@ -942,7 +942,7 @@ export default function Estudiantes() {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Número</label>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Número <span className="text-red-500">*</span></label>
                             <input 
                               type="text" 
                               placeholder="Ej: 1234" 
@@ -963,7 +963,7 @@ export default function Estudiantes() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Comuna</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Comuna <span className="text-red-500">*</span></label>
                           <input 
                             type="text" 
                             placeholder="Ej: Valparaíso" 
