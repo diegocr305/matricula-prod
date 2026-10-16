@@ -822,23 +822,50 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
             for campo in ("calle", "numero", "sector", "comuna")
         )
 
+        # ¿Cambió realmente la dirección? Si sí, limpiamos lat/lon para que el alumno
+        # entre a la "cola" de geocodificación (worker manual la resuelve 1/seg, por
+        # detrás, sin llamar a OpenStreetMap al guardar ni saturar su límite).
+        def _dir_cambio_para_geo(nuevos: dict) -> bool:
+            return any((dir_anterior.get(k) or "") != (nuevos.get(k) or "")
+                       for k in ("calle", "numero", "sector", "comuna", "domicilio"))
+
         if usa_estructurado:
             calle = (req.calle or "").strip() or None
             numero = (req.numero or "").strip() or None
             sector = (req.sector or "").strip() or None
             comuna = (req.comuna or "").strip() or None
             domicilio_final = componer_domicilio(calle, numero, sector, comuna)
-            cur.execute(
-                "UPDATE estudiante SET calle = %s, numero = %s, sector = %s, comuna = %s, "
-                "domicilio = %s WHERE id_estudiante = %s",
-                (calle, numero, sector, comuna, domicilio_final, id_estudiante),
-            )
+            cambio_geo = _dir_cambio_para_geo({
+                "calle": calle, "numero": numero, "sector": sector,
+                "comuna": comuna, "domicilio": domicilio_final,
+            })
+            if cambio_geo:
+                # Marcar pendiente de geocodificar: lat/lon a NULL.
+                cur.execute(
+                    "UPDATE estudiante SET calle = %s, numero = %s, sector = %s, comuna = %s, "
+                    "domicilio = %s, latitud = NULL, longitud = NULL, geo_precision = NULL "
+                    "WHERE id_estudiante = %s",
+                    (calle, numero, sector, comuna, domicilio_final, id_estudiante),
+                )
+            else:
+                cur.execute(
+                    "UPDATE estudiante SET calle = %s, numero = %s, sector = %s, comuna = %s, "
+                    "domicilio = %s WHERE id_estudiante = %s",
+                    (calle, numero, sector, comuna, domicilio_final, id_estudiante),
+                )
         elif req.domicilio_estudiante is not None:
             domicilio_final = req.domicilio_estudiante
-            cur.execute(
-                "UPDATE estudiante SET domicilio = %s WHERE id_estudiante = %s",
-                (domicilio_final, id_estudiante),
-            )
+            if _dir_cambio_para_geo({"domicilio": domicilio_final}):
+                cur.execute(
+                    "UPDATE estudiante SET domicilio = %s, latitud = NULL, longitud = NULL, "
+                    "geo_precision = NULL WHERE id_estudiante = %s",
+                    (domicilio_final, id_estudiante),
+                )
+            else:
+                cur.execute(
+                    "UPDATE estudiante SET domicilio = %s WHERE id_estudiante = %s",
+                    (domicilio_final, id_estudiante),
+                )
         else:
             domicilio_final = prev_dom
 

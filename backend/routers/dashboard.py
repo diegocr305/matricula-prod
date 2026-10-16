@@ -39,8 +39,22 @@ def obtener_muestra_geo(
     limite: int = 15,
     usuario_actual: dict = Depends(requiere_pestana(roles.TAB_PANEL))
 ):
-    """Muestra de direcciones reales anonimizadas para el mapa de ejemplo."""
+    """Muestra de direcciones reales anonimizadas para el mapa de ejemplo (legado:
+    geocodifica al vuelo en el cliente). Se mantiene por compatibilidad."""
     if not roles.es_slep(usuario_actual.get("rol")):
         establecimiento_id = usuario_actual.get("id_establecimiento")
     limite = max(1, min(limite, 30))
     return dashboard_service.obtener_muestra_geo_db(establecimiento_id, limite)
+
+
+@router.get("/puntos-geo")
+def obtener_puntos_geo(
+    establecimiento_id: Optional[int] = None,
+    anio: Optional[int] = None,
+    usuario_actual: dict = Depends(requiere_pestana(roles.TAB_PANEL))
+):
+    """Puntos del mapa con coordenadas YA guardadas (las calcula el worker por detrás).
+    El mapa solo las lee: instantáneo, sin geocodificar en el navegador ni límite OSM."""
+    if not roles.es_slep(usuario_actual.get("rol")):
+        establecimiento_id = usuario_actual.get("id_establecimiento")
+    return dashboard_service.obtener_puntos_geo_db(establecimiento_id, anio)

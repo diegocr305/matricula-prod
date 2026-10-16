@@ -386,6 +386,83 @@ def obtener_calidad_dato_por_establecimiento_db(establecimiento_id: int = None, 
         conn.close()
 
 
+def obtener_puntos_geo_db(establecimiento_id: int = None, anio: int = None):
+    """Devuelve los alumnos que YA tienen coordenadas guardadas (latitud/longitud),
+    para que el mapa del Panel las LEA directo (sin geocodificar al vuelo).
+
+    Las coordenadas las calcula por detrás el worker `geocodificar_pendientes.py`
+    (cola 1/seg contra OpenStreetMap). Aquí solo se leen: es instantáneo y no
+    depende de OSM ni de su límite de uso. Anonimiza: iniciales + curso + comuna.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        if anio is None:
+            cur.execute("SELECT MAX(anio_escolar) FROM matricula")
+            row = cur.fetchone()
+            anio = row[0] if row and row[0] else None
+
+        filtros = ["m.anio_escolar = %s", "m.estado = 'Activa'",
+                   "e.latitud IS NOT NULL", "e.longitud IS NOT NULL"]
+        params = [anio]
+        if establecimiento_id is not None:
+            filtros.append("m.id_establecimiento = %s")
+            params.append(establecimiento_id)
+
+        cur.execute(f"""
+            SELECT DISTINCT est.nombre, est.rbd,
+                   e.nombres, e.apellido_paterno, m.curso, e.comuna,
+                   e.latitud, e.longitud
+            FROM matricula m
+            JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+            JOIN establecimiento est ON est.id_establecimiento = m.id_establecimiento
+            WHERE {' AND '.join(filtros)}
+        """, tuple(params))
+        filas = cur.fetchall()
+
+        nombre_colegio = filas[0][0] if filas else ""
+        rbd = filas[0][1] if filas else ""
+        puntos = []
+        for r in filas:
+            nombres, ap_pat, curso, comuna, lat, lon = r[2:]
+            try:
+                lat_f = float(lat)
+                lon_f = float(lon)
+            except (TypeError, ValueError):
+                continue
+            puntos.append({
+                "etiqueta": f"{(nombres or '?')[:1]}.{(ap_pat or '?')[:1]}.",
+                "curso": curso,
+                "comuna": comuna,
+                "lat": lat_f,
+                "lon": lon_f,
+            })
+
+        # Cuántos faltan por geocodificar (para mostrar cobertura en el panel).
+        cur.execute(f"""
+            SELECT COUNT(*) FROM matricula m JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+            WHERE m.anio_escolar = %s AND m.estado = 'Activa'
+              {'AND m.id_establecimiento = %s' if establecimiento_id is not None else ''}
+              AND e.domicilio ~ '[0-9]' AND e.comuna IS NOT NULL AND trim(e.comuna) <> ''
+        """, tuple(params[:1] + ([establecimiento_id] if establecimiento_id is not None else [])))
+        total_geocodificable = cur.fetchone()[0]
+
+        return {
+            "anio": anio,
+            "id_establecimiento": establecimiento_id,
+            "nombre_colegio": nombre_colegio,
+            "rbd": rbd,
+            "con_coordenadas": len(puntos),
+            "total_geocodificable": total_geocodificable,
+            "puntos": puntos,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error al obtener puntos geo: " + str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
 def obtener_muestra_geo_db(establecimiento_id: int = None, limite: int = 15):
     """Muestra de direcciones reales (anonimizadas) de un colegio para el mapa de ejemplo.
     No expone el nombre completo del menor: devuelve iniciales + curso + direccion.
