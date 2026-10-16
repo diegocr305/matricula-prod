@@ -651,8 +651,109 @@ def buscar_apoderado_por_rut_db(rut_apoderado: str):
         conn.close()
 
 
-def _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nueva):
-    """Registra en auditoria_matricula el cambio de datos de la ficha del estudiante."""
+def _snapshot_ficha(cur, id_estudiante, id_apod_princ, id_apod_supl):
+    """Toma una foto de los datos de apoderado titular, suplente y ficha de salud,
+    para comparar antes/después y auditar TODA la ficha, no solo el domicilio.
+    No incluye el domicilio del alumno (ese se audita con detalle aparte)."""
+    def datos_apoderado(id_apod):
+        if not id_apod:
+            return None
+        cur.execute(
+            "SELECT rut_pasaporte, nombres, apellido_paterno, apellido_materno, "
+            "domicilio, telefono, correo_electronico, relacion_estudiante "
+            "FROM apoderado WHERE id_apoderado = %s",
+            (id_apod,),
+        )
+        r = cur.fetchone()
+        if not r:
+            return None
+        return {
+            "rut": r[0], "nombres": r[1], "apellido_paterno": r[2], "apellido_materno": r[3],
+            "domicilio": r[4], "telefono": r[5], "correo_electronico": r[6], "relacion": r[7],
+        }
+
+    cur.execute(
+        "SELECT sistema_salud, letra_fonasa, cesfam, centro_emergencia, alergias, "
+        "diagnostico_medico, medico_tratante, medicamento, nee, nee_tipo "
+        "FROM ficha_salud WHERE id_estudiante = %s",
+        (id_estudiante,),
+    )
+    s = cur.fetchone()
+    salud = None
+    if s:
+        salud = {
+            "sistema_salud": s[0], "letra_fonasa": s[1], "cesfam": s[2],
+            "centro_emergencia": s[3], "alergias": s[4], "diagnostico_medico": s[5],
+            "medico_tratante": s[6], "medicamento": s[7], "nee": s[8], "nee_tipo": s[9],
+        }
+
+    return {
+        "apoderado_titular": datos_apoderado(id_apod_princ),
+        "apoderado_suplente": datos_apoderado(id_apod_supl),
+        "salud": salud,
+    }
+
+
+# Etiquetas legibles por sección (qué campos cambiaron; sin exponer valores sensibles).
+_ETIQUETA_SECCION = {
+    "apoderado_titular": "Apoderado titular",
+    "apoderado_suplente": "Apoderado suplente",
+    "salud": "Ficha de salud",
+}
+
+
+def _comparar_seccion(antes, despues):
+    """Devuelve la lista de campos que cambiaron entre dos dicts (o None)."""
+    if antes is None and despues is None:
+        return []
+    if antes is None:
+        return ["(agregado)"]
+    if despues is None:
+        return ["(eliminado)"]
+    campos = []
+    for k in despues:
+        if (antes.get(k) or "") != (despues.get(k) or ""):
+            campos.append(k)
+    return campos
+
+
+def _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nueva,
+                                    snapshot_antes=None, snapshot_despues=None):
+    """Registra en auditoria_matricula los cambios de la ficha del estudiante
+    (domicilio del alumno + apoderado titular/suplente + ficha de salud).
+
+    REGLA: solo registra si hubo un cambio REAL. Si nada cambió, no crea evento
+    (evita el ruido de "sin cambios" al guardar sin modificar nada).
+
+    PRIVACIDAD: el domicilio del alumno sí se guarda con sus valores (es dato
+    georreferenciable del registro). Para apoderado y salud se guarda SOLO qué
+    campos cambiaron (nombres de campo), sin exponer teléfonos/correos/valores.
+    """
+    # 1. ¿Cambió el domicilio del alumno?
+    dir_cambio = any((dir_anterior.get(k) or "") != (dir_nueva.get(k) or "")
+                     for k in ("calle", "numero", "sector", "comuna", "domicilio"))
+
+    # 2. ¿Cambió apoderado/salud? (detalle de campos por sección)
+    secciones_cambiadas = {}
+    if snapshot_antes is not None and snapshot_despues is not None:
+        for sec in ("apoderado_titular", "apoderado_suplente", "salud"):
+            campos = _comparar_seccion(snapshot_antes.get(sec), snapshot_despues.get(sec))
+            if campos:
+                secciones_cambiadas[sec] = campos
+
+    # Si no cambió NADA, no registramos auditoría.
+    if not dir_cambio and not secciones_cambiadas:
+        return
+
+    # 3. Armar resumen legible de lo que cambió.
+    partes = []
+    if dir_cambio:
+        partes.append("Domicilio del estudiante")
+    for sec, campos in secciones_cambiadas.items():
+        partes.append(f"{_ETIQUETA_SECCION[sec]} ({', '.join(campos)})")
+    resumen = "Actualización de ficha: " + " · ".join(partes)
+
+    # 4. Buscar la matrícula a la que colgar el evento (modelo actual de auditoría).
     cur.execute(
         """
         SELECT id_matricula FROM matricula
@@ -664,10 +765,21 @@ def _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nuev
     mat_result = cur.fetchone()
     if not mat_result:
         return
-
     id_matricula = mat_result[0]
-    datos_ant = json.dumps({"direccion": dir_anterior}, ensure_ascii=False, default=str)
-    datos_nuev = json.dumps({"direccion": dir_nueva}, ensure_ascii=False, default=str)
+
+    # 5. Snapshots: domicilio con valores; apoderado/salud solo campos cambiados.
+    datos_ant = json.dumps({
+        "tipo": "actualizacion_ficha",
+        "resumen": resumen,
+        "direccion": dir_anterior if dir_cambio else None,
+        "secciones_modificadas": list(secciones_cambiadas.keys()),
+    }, ensure_ascii=False, default=str)
+    datos_nuev = json.dumps({
+        "tipo": "actualizacion_ficha",
+        "resumen": resumen,
+        "direccion": dir_nueva if dir_cambio else None,
+        "campos_modificados": secciones_cambiadas,
+    }, ensure_ascii=False, default=str)
     cur.execute(
         """
         INSERT INTO auditoria_matricula (id_matricula, accion, id_usuario, datos_anteriores, datos_nuevos)
@@ -699,6 +811,10 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
             "calle": prev_calle, "numero": prev_num, "sector": prev_sec,
             "comuna": prev_com, "domicilio": prev_dom
         }
+
+        # Snapshot ANTES de apoderado(s) y salud, para auditar TODA la ficha (no solo
+        # el domicilio del alumno). Se compara con el snapshot DESPUÉS al final.
+        snapshot_antes = _snapshot_ficha(cur, id_estudiante, id_apod_princ, id_apod_supl)
 
         # 2. Dirección del estudiante: estructurada o campo único
         usa_estructurado = any(
@@ -874,8 +990,17 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
                     fecha_actualizacion = CURRENT_TIMESTAMP;
             """, (id_estudiante, sis_salud, let_fon, cesfam, emergencia, alergias, diag_med, med_trat, meds, nee, nee_tipo))
 
-        # 6. Trazabilidad: registrar en auditoría real
-        _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nueva)
+        # 6. Trazabilidad: snapshot DESPUÉS y registro de auditoría SOLO si hubo cambio real.
+        # Reobtenemos los ids de apoderado por si se vincularon/crearon en este guardado.
+        cur.execute(
+            "SELECT id_apoderado_principal, id_apoderado_suplente FROM estudiante WHERE id_estudiante = %s",
+            (id_estudiante,),
+        )
+        _ap_p, _ap_s = cur.fetchone()
+        snapshot_despues = _snapshot_ficha(cur, id_estudiante, _ap_p, _ap_s)
+        _registrar_auditoria_estudiante(
+            cur, rut, id_usuario, dir_anterior, dir_nueva, snapshot_antes, snapshot_despues
+        )
 
         conn.commit()
         return {"mensaje": "Datos y ficha médica actualizados exitosamente"}

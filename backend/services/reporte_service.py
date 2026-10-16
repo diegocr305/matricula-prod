@@ -16,6 +16,11 @@ def clasificar_evento(accion: str, datos_ant: any, datos_nuev: any) -> tuple[str
         return 'ALTA', 'Nueva matrícula registrada en el sistema.'
 
     if accion == 'UPDATE':
+        # 0. Actualización de ficha del estudiante (domicilio / apoderado / salud).
+        #    Trae un 'resumen' legible generado al guardar; lo usamos directo.
+        if nuev.get('tipo') == 'actualizacion_ficha':
+            return 'ACTUALIZACION', nuev.get('resumen') or 'Actualización de ficha del estudiante.'
+
         # 1. Retiro de estudiante
         if nuev.get('estado') == 'Retirado' and ant.get('estado') != 'Retirado':
             motivo = nuev.get('motivo_retiro') or 'Sin motivo inicial'
