@@ -430,6 +430,12 @@ export const useEstudiantes = () => {
       // Precargar TODO el formulario de edición con los datos existentes
       setDatosEdicion({
         domicilio: datos.personal?.domicilio && datos.personal.domicilio !== 'Sin registrar' ? datos.personal.domicilio : '',
+        // Dirección estructurada del estudiante (para que los inputs muestren lo existente
+        // y el guardado envíe estos campos, no solo el domicilio compuesto).
+        calle: datos.personal?.calle || '',
+        numero: datos.personal?.numero || '',
+        sector: datos.personal?.sector || '',
+        comuna: datos.personal?.comuna || '',
         
         // Titular
         rut_apoderado: datos.apoderado?.rut && datos.apoderado.rut !== 'Sin registrar' ? datos.apoderado.rut : '',
@@ -473,10 +479,24 @@ export const useEstudiantes = () => {
   };
 
   const handleGuardarEdicion = async () => {
+    // Validación: el domicilio del estudiante debe quedar en los campos correctos.
+    // Se exige al menos Calle y Comuna (el número puede faltar en sectores rurales).
+    if (!((datosEdicion.calle || '').trim()) || !((datosEdicion.comuna || '').trim())) {
+      toast.warning("Complete al menos la Calle y la Comuna del domicilio del estudiante.");
+      return;
+    }
+
     setGuardandoEdicion(true);
     const token = localStorage.getItem('token');
     try {
       const payloadEnvio = {
+        // Dirección estructurada del estudiante: se envían los 4 campos para que el
+        // backend los persista y los audite (antes solo se mandaba el texto compuesto,
+        // por eso el domicilio del alumno no se actualizaba ni quedaba en auditoría).
+        calle: (datosEdicion.calle || '').trim(),
+        numero: (datosEdicion.numero || '').trim(),
+        sector: (datosEdicion.sector || '').trim(),
+        comuna: (datosEdicion.comuna || '').trim(),
         domicilio_estudiante: datosEdicion.domicilio || "Sin registrar",
         
         // Titular

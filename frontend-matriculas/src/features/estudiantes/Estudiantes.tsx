@@ -901,13 +901,35 @@ export default function Estudiantes() {
                   </div>
 
                   <div className="pt-2 border-t border-gray-50">
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">
-                      Domicilio Actual {modoEdicion && <span className="text-red-500">*</span>}
-                    </p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-gray-500 uppercase">
+                        Domicilio Actual {modoEdicion && <span className="text-red-500">*</span>}
+                      </p>
+                      {modoEdicion && (
+                        <button
+                          type="button"
+                          onClick={() => setDatosEdicion({
+                            ...datosEdicion,
+                            calle: datosEdicion.domicilio_apoderado || datosEstudiante.apoderado?.domicilio || '',
+                            numero: '',
+                            sector: '',
+                            comuna: '',
+                          })}
+                          className="text-xs text-blue-600 font-bold hover:underline"
+                          title="Trae la dirección del apoderado a Calle para que la separes en Calle/Número/Sector/Comuna"
+                        >
+                          Copiar del Apoderado
+                        </button>
+                      )}
+                    </div>
                     {!modoEdicion ? (
                       <p className="font-medium text-gray-800">{datosEstudiante.personal.domicilio}</p>
                     ) : (
                       <div className="space-y-2">
+                        <p className="text-[11px] text-gray-400 leading-snug">
+                          Copie la dirección del apoderado y luego separe el dato en cada campo:
+                          la calle en Calle, el número en Número, etc.
+                        </p>
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Calle</label>
                           <input 
