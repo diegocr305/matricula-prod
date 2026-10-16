@@ -56,6 +56,46 @@ Ubicación: `/opt/bitnami/nginx/conf/server_blocks/`. Los nuestros:
 - Validar SIEMPRE con `sudo /opt/bitnami/nginx/sbin/nginx -t` antes de recargar.
 - Recargar: `sudo /opt/bitnami/ctlscript.sh restart nginx`.
 
+### Caché del frontend — evitar el Ctrl+F5 tras cada deploy (IMPORTANTE)
+Problema: tras `npm run build`, los usuarios seguían viendo el front viejo hasta hacer
+Ctrl+F5, porque el navegador/Cloudflare cacheaban el `index.html`. Vite ya pone hash en
+los assets (`index-<hash>.js`), así que el ÚNICO archivo que debe NO cachearse es el
+`index.html`: si llega fresco, apunta al JS/CSS nuevo y todo se propaga solo.
+
+Solución (dos capas, ya que los dominios están detrás de Cloudflare):
+1. **HTML (ya en el repo)**: `frontend-matriculas/index.html` lleva meta tags
+   `Cache-Control: no-cache, no-store, must-revalidate`. Se despliega con el build normal.
+2. **Nginx (aplicar en el servidor, en `14-matriculas-https.conf`)**: agregar DENTRO del
+   `server { ... }` que sirve el `dist/`, ANTES del `location /` de la SPA:
+
+   ```nginx
+   # index.html SIEMPRE fresco (se propaga el deploy sin Ctrl+F5)
+   location = /index.html {
+       root /opt/bitnami/nginx/apps/matriculas/frontend-matriculas/dist;
+       add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+       expires -1;
+   }
+   # Assets con hash: cachear agresivo (su nombre cambia en cada build)
+   location /assets/ {
+       root /opt/bitnami/nginx/apps/matriculas/frontend-matriculas/dist;
+       expires 1y;
+       add_header Cache-Control "public, immutable";
+   }
+   # SPA (debe ir DESPUÉS de los dos anteriores)
+   location / {
+       root /opt/bitnami/nginx/apps/matriculas/frontend-matriculas/dist;
+       try_files $uri $uri/ /index.html;
+   }
+   ```
+   Validar y recargar: `sudo /opt/bitnami/nginx/sbin/nginx -t` y luego
+   `sudo /opt/bitnami/ctlscript.sh restart nginx`.
+
+Alcance real: esto elimina el Ctrl+F5 para quien **navega o recarga** tras el deploy.
+Una pestaña YA abierta y quieta seguirá en la versión vieja hasta un F5 normal (ninguna
+config "empuja" código a una pestaña inactiva; eso requeriría un chequeo de versión en la
+app, pendiente). Si Cloudflare tuviera una Cache Rule propia para el HTML, habría que
+excluir `index.html` ahí también (hoy no tenemos acceso al panel de Cloudflare).
+
 ## HTTPS / Certificado
 - Emitido con: `sudo certbot certonly --webroot -w /opt/bitnami/nginx/html -d matricula.slepvalparaiso.gob.cl -d rgm.slepvalparaiso.gob.cl`
 - Método webroot (el mismo que usan reservas/repositorio). Renovación automática por certbot.

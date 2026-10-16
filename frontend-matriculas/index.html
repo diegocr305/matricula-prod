@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/images/favicon-slep.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- No cachear el HTML: así, al navegar o recargar tras un deploy, el navegador
+         siempre pide el index nuevo (que apunta al JS/CSS con hash nuevo) sin Ctrl+F5.
+         Los assets con hash sí se cachean (los sirve Nginx). Refuerza la cabecera de
+         Nginx por si Cloudflare intentara cachear el HTML. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>RGM Matrículas SLEP Valparaíso</title>
   </head>
   <body>
