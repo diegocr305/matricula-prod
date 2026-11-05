@@ -100,13 +100,43 @@ Las correcciones de datos NO requieren deploy (ya están en Supabase).
 
 ## 7. Cómo se generaliza a otros establecimientos
 
-Este flujo es el patrón para cada RBD. Insumos por colegio (en carpeta separada, p. ej.
-`csv pruebas/matricula_<rbd>/`): la exportación de SIGE (`.xls`-HTML) y el Excel del formulario.
-Pasos: (1) diagnóstico de fuentes, (2) cruce por cuerpo de RUT contra el RGM, (3) clasificar
-diferencias (nuevo/coincidente/curso distinto/retiro/identidad IPE↔RUN), (4) corregir con un
-script hermano del 09 (DRY-RUN primero), (5) dejar pendientes lo que el colegio debe confirmar.
+Este flujo es el patrón para cada RBD. Insumos por colegio (carpeta separada
+`csv pruebas/matricula_<anio>/<rbd>/`): exportación SIGE (`.xls`-HTML) y Excel del formulario.
+
+### Herramienta: `produccion/10_diagnostico_consolidacion.py` (SOLO LECTURA)
+Generaliza el diagnóstico para cualquier RBD. Uso: `python produccion/10_diagnostico_consolidacion.py --rbd 1502 [--anio 2026] [--csv]`.
+- Cruza SIGE ↔ Formulario ↔ RGM por **cuerpo de RUT**.
+- Clasifica: SOLO_EN_RGM, SOLO_EN_SIGE, SOLO_EN_FORMULARIO, RETIRO_SIGE_NO_EN_RGM
+  (indica si el Excel también lo marca), CURSO_DISTINTO_SIGE_RGM.
+- **Mapeo tolerante por nombre de encabezado** (no por posición): resiste que los colegios
+  muevan/renombren columnas. Contrato de campos en
+  `.kiro/specs/integracion-sige/contrato-campos-rgm.md`.
+- No modifica la base; es el paso previo a una corrección (script tipo 09, por colegio).
+
+### Observación de formatos (nov 2026, RBD 1520/1502/14678)
+- **SIGE** (`.xls`-HTML): 24 columnas IDÉNTICAS en los 3 colegios. Formato estable del Ministerio.
+- **Formulario** (`.xlsx`): plantilla oficial casi idéntica (~59-60 col). El 1502 trae los valores
+  en MAYÚSCULAS (`1° MEDIO G`); el normalizador lo resuelve. Mapear por nombre, no por posición.
+
+### Hallazgos del diagnóstico de los 3 colegios
+- **14678 (Juan de Saavedra, 108 alumnos)**: muy limpio. 5 en SIGE no en RGM, 3 retiros SIGE
+  (2 confirmados en Excel), 0 cursos distintos.
+- **1502 (Inst. Comercio, 861 alumnos)**: muchos descuadres. Lecciones clave:
+  1. **El RGM tiene alumnos en cursos de EDUCACIÓN DE ADULTOS** (`1er nivel (1° y 2° medio) A`)
+     cuando SIGE y el formulario dicen media regular -> error de carga (catálogo sucio,
+     `determinar_nivel`/`obtener_rango_curso`). Revisar.
+  2. **39 cursos distintos** donde las TRES fuentes discrepan entre sí (SIGE una letra, Excel
+     otra, RGM otra) -> NO corregible automáticamente; el colegio debe decir la sección real.
+  3. **Duplicado IPE↔RUN** (Erignis Gabazut: IPE 100636364 solo en RGM, RUN 29210864 solo en
+     SIGE) -> aplicar regla IPE→RUN.
+  4. 34 retiros SIGE no reflejados (solo ~9 confirmados también en Excel).
+- **Conclusión**: la consolidación NO puede ser automática para todos. En colegios donde las
+  tres fuentes discrepan (1502) se requiere validación del colegio. El diagnóstico (solo lectura)
+  es seguro y sistemático; la corrección es por colegio y con decisiones humanas (script tipo 09).
+
 La versión con UI y staging de este flujo es el módulo Integración SIGE
-(`.kiro/specs/integracion-sige/`).
+(`.kiro/specs/integracion-sige/`), y el contrato de campos capturados por el RGM está en
+`.kiro/specs/integracion-sige/contrato-campos-rgm.md`.
 
 ## 8. Nota de privacidad
 Todo el cruce se hizo con lectura local de los Excel (no versionados; `.gitignore` excluye
