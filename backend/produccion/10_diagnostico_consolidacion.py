@@ -143,6 +143,9 @@ def leer_formulario(path):
 
 
 def leer_sige(path):
+    """Devuelve (registros, duplicados). 'registros' tiene 1 entrada por RUN usando la
+    fila VIGENTE (no retirada) cuando el alumno aparece varias veces en SIGE. 'duplicados'
+    lista los RUN con más de una fila (cambios de sección/modalidad no depurados en SIGE)."""
     doc = lh.fromstring(open(path, "rb").read())
     t = max(doc.xpath("//table"), key=lambda x: len(x.xpath(".//tr")))
     filas = t.xpath(".//tr")
@@ -154,26 +157,38 @@ def leer_sige(path):
                 return i
         return None
     i_run = col("run"); i_desc = col("desc grado"); i_letra = col("letra curso")
-    i_ret = col("fecha retiro"); i_nom = col("nombres")
+    i_ret = col("fecha retiro"); i_nom = col("nombres"); i_ens = col("cod tipo ensenanza")
     i_pat = col("apellido paterno"); i_mat = col("apellido materno")
-    out = {}
+
+    por_run = {}  # cuerpo -> lista de filas parseadas
     for tr in filas[1:]:
         c = [x.text_content().strip() for x in tr.xpath(".//td|.//th")]
         if i_run is None or i_run >= len(c) or not c[i_run]:
             continue
         k = cuerpo(c[i_run])
-        if not k or k in out:
+        if not k:
             continue
         retiro = c[i_ret].strip() if i_ret is not None and i_ret < len(c) else ""
         activo = retiro in ("", "1900-01-01", "01-01-1900", "1900-1-1")
         curso = f"{c[i_desc].strip() if i_desc is not None else ''} {c[i_letra].strip() if i_letra is not None else ''}".strip()
-        out[k] = {
+        fila = {
             "nombre": f"{c[i_nom] if i_nom is not None else ''} {c[i_pat] if i_pat is not None else ''} {c[i_mat] if i_mat is not None else ''}".strip(),
             "curso": curso,
+            "cod_ens": c[i_ens].strip() if i_ens is not None and i_ens < len(c) else "",
             "retirado": not activo,
             "fecha_retiro": "" if activo else retiro,
         }
-    return out
+        por_run.setdefault(k, []).append(fila)
+
+    out = {}
+    duplicados = {}
+    for k, filas_run in por_run.items():
+        if len(filas_run) > 1:
+            duplicados[k] = filas_run
+        # elegir la fila VIGENTE (no retirada) si existe; si todas retiradas, la primera
+        vigente = next((f for f in filas_run if not f["retirado"]), filas_run[0])
+        out[k] = vigente
+    return out, duplicados
 
 
 def leer_rgm(cur, id_establecimiento, anio):
@@ -221,7 +236,7 @@ def main():
     print(f"SIGE : {sige_path.name}")
     print(f"Form : {form_path.name}\n")
 
-    sige = leer_sige(str(sige_path))
+    sige, sige_dups = leer_sige(str(sige_path))
     form, idx = leer_formulario(str(form_path))
 
     conn = get_db_connection()
@@ -250,6 +265,7 @@ def main():
                                         and rgm[k]["estado"] in ("Activa", "Promovido", "Repitente")),
         "CURSO_DISTINTO_SIGE_RGM": sorted(k for k in (S & R)
                                           if norm_curso(sige[k]["curso"]) != norm_curso(rgm[k]["curso"])),
+        "DUPLICADO_EN_SIGE": sorted(set(sige_dups) - EXCLUIR_CUERPOS),
     }
 
     for nombre, claves in cat.items():
@@ -262,6 +278,11 @@ def main():
                 extra = f" | SIGE='{s.get('curso')}' FORM='{f.get('curso','-')}' RGM='{r.get('curso')}'"
             elif nombre == "RETIRO_SIGE_NO_EN_RGM":
                 extra = f" | SIGE retiro {s.get('fecha_retiro')} / RGM {r.get('estado')} | ¿Excel retiro? {'SI' if f.get('retirado') else 'no'}"
+            elif nombre == "DUPLICADO_EN_SIGE":
+                variantes = " / ".join(f"{x['cod_ens']}:{x['curso']}{' (RET)' if x['retirado'] else ''}"
+                                       for x in sige_dups[k])
+                detalle = sige_dups[k][0]["nombre"]
+                extra = f" | {variantes}"
             print(f"   {k} | {detalle}{extra}")
         if len(claves) > 40:
             print(f"   ... (+{len(claves)-40} más)")
