@@ -96,12 +96,7 @@ CURSOS_CORRECTOS = []
 # Verificado con el cruce de ambas planillas. La fecha es la REAL de la fuente
 # (cuando SIGE y Excel difieren por pocos días, se usa la de SIGE, la oficial).
 # cuerpo -> (nombre, fecha_retiro 'YYYY-MM-DD')
-# Decisión del dueño: SIGE es la fuente OFICIAL del retiro. Todos los que SIGE reporta
-# retirados se marcan Retirada en el RGM, aunque el Excel del colegio no lo haya
-# actualizado (lo más probable es que el colegio no actualizó su planilla). Si el
-# colegio luego confirma que alguno NO se retiró, se revierte puntualmente.
 RETIROS_CONFIRMADOS = [
-    # Confirmados en SIGE + Excel:
     ("22775606", "Antonia Guzmán",      "2026-03-24"),
     ("23129693", "Ailyn Alegría",       "2026-09-21"),
     ("23256638", "Gabriela Arias",      "2026-07-08"),  # SIGE 07-08 / Excel 07-06
@@ -109,16 +104,17 @@ RETIROS_CONFIRMADOS = [
     ("23339970", "Anahiz Miranda",      "2026-07-06"),
     ("23846466", "Antonella González",  "2026-07-03"),  # SIGE 07-03 / Excel 07-06
     ("23917054", "Armando Mateluna",    "2026-09-10"),
-    # Solo en SIGE (oficial): el Excel no reflejó el retiro, pero SIGE manda.
-    ("23322891", "Martina Valdivia",    "2026-06-12"),
-    ("23427590", "Javiera Torres",      "2026-07-06"),
-    ("23502969", "Isaías Peña",         "2026-10-06"),
-    ("23660727", "Mayra Sepúlveda",     "2026-08-19"),
-    ("23700495", "Joaquín Marchant",    "2026-10-07"),
-    ("23842701", "Felipe Perez",        "2026-08-20"),
 ]
-# Ya no quedan retiros pendientes de revisión: SIGE (oficial) decide.
-RETIROS_SOLO_SIGE_REVISAR = []
+# Retiros que SIGE reporta pero el Excel NO confirma -> NO se aplican; pendientes de
+# que el colegio valide (solo documentados, no se tocan):
+RETIROS_SOLO_SIGE_REVISAR = [
+    ("23322891", "Martina Valdivia",  "2026-06-12"),
+    ("23427590", "Javiera Torres",    "2026-07-06"),
+    ("23502969", "Isaías Peña",       "2026-10-06"),
+    ("23660727", "Mayra Sepúlveda",   "2026-08-19"),
+    ("23700495", "Joaquín Marchant",  "2026-10-07"),
+    ("23842701", "Felipe Perez",      "2026-08-20"),
+]
 
 
 def auditar(cur, id_matricula, antes, despues):
@@ -305,26 +301,25 @@ def bloque_retiros(cur, aplicar):
         id_mat, estado, curso = r[0], r[1], r[2]
         print(f"  cuerpo {cuerpo} ({nombre}) mat#{id_mat} {curso}: '{estado}' -> 'Retirada' (fecha {fecha})")
         if aplicar:
-            obs = (f"Retiro consolidado desde SIGE (fuente oficial, fecha {fecha}): el retiro "
-                   "constaba en SIGE y no se capturó al importar la nómina.")
+            obs = (f"Retiro consolidado desde SIGE + Excel (fecha {fecha}): el retiro constaba "
+                   "en ambas fuentes y no se capturó al importar la nómina.")
             cur.execute(
                 """UPDATE matriculas.matricula
                    SET estado='Retirada',
                        fecha_retiro=%s::date,
-                       motivo_retiro=COALESCE(motivo_retiro,'Retiro registrado en SIGE (fuente oficial)'),
+                       motivo_retiro=COALESCE(motivo_retiro,'Retiro registrado en SIGE y Excel'),
                        observaciones=CASE WHEN observaciones IS NULL OR observaciones=''
                                           THEN %s ELSE observaciones||' | '||%s END
                    WHERE id_matricula=%s""",
                 (fecha, obs, obs, id_mat),
             )
             auditar(cur, id_mat, {"estado": estado},
-                    {"estado": "Retirada", "fecha_retiro": fecha, "fuente": "SIGE"})
-    print(f"  Retiros aplicables (de los activos en el RGM): {encontrados}/{len(RETIROS_CONFIRMADOS)}")
+                    {"estado": "Retirada", "fecha_retiro": fecha, "fuente": "SIGE+Excel"})
+    print(f"  Retiros confirmados aplicables: {encontrados}/{len(RETIROS_CONFIRMADOS)}")
 
-    if RETIROS_SOLO_SIGE_REVISAR:
-        print("\n  PENDIENTES de validación del colegio:")
-        for cuerpo, nombre, fecha in RETIROS_SOLO_SIGE_REVISAR:
-            print(f"    - {nombre} (cuerpo {cuerpo}), SIGE dice retiro {fecha}. NO se toca.")
+    print("\n  PENDIENTES (SIGE reporta retiro pero el Excel NO lo confirma -> validar con el colegio):")
+    for cuerpo, nombre, fecha in RETIROS_SOLO_SIGE_REVISAR:
+        print(f"    - {nombre} (cuerpo {cuerpo}), SIGE dice retiro {fecha}. NO se toca.")
 
 
 def main():
