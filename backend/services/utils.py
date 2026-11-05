@@ -45,3 +45,62 @@ def normalizar_rut(rut) -> str:
         return limpio
     cuerpo, dv = limpio[:-1], limpio[-1]
     return f"{cuerpo}-{dv}"
+
+
+def normalizar_texto_curso(curso_str) -> str:
+    """Normaliza el texto libre de 'curso' a una forma canónica única, para evitar
+    duplicados en los filtros (DISTINCT curso) por diferencias de mayúsculas/espacios.
+
+    Problema que resuelve: la carga masiva SIGE y la matrícula manual generaban el
+    mismo curso con formato distinto ('8° Básico A' vs '8° básico A'), y como el
+    campo 'curso' es texto libre, el selector de cursos los mostraba como dos cursos
+    distintos (uno real y otro casi vacío).
+
+    Regla canónica (coincide con el formato mayoritario que trae SIGE):
+      - Colapsa espacios múltiples.
+      - Capitaliza las palabras de grado conocidas: Básico, Media/Medio, Kínder,
+        Prekínder, Transición, etc.
+      - La letra final de curso (una sola letra) queda en MAYÚSCULA.
+      - No inventa datos: si no reconoce el patrón, solo limpia espacios y deja el
+        texto tal cual (sin forzar), para no corromper cursos atípicos.
+
+    Ejemplos:
+      '8° básico a'   -> '8° Básico A'
+      '3° MEDIO b'    -> '3° Medio B'
+      '  1°  medio C' -> '1° Medio C'
+      'Pre-Kinder A'  -> 'Pre-Kinder A'  (no reconocido como patrón estándar: solo limpia)
+    """
+    if curso_str is None:
+        return curso_str
+    texto = re.sub(r"\s+", " ", str(curso_str)).strip()
+    if not texto:
+        return texto
+
+    # Mapa de palabras de grado -> forma canónica (comparación sin acentos/caso).
+    reemplazos = {
+        "basico": "Básico",
+        "básico": "Básico",
+        "basica": "Básica",
+        "básica": "Básica",
+        "medio": "Medio",
+        "media": "Media",
+        "kinder": "Kínder",
+        "kínder": "Kínder",
+        "prekinder": "Prekínder",
+        "prekínder": "Prekínder",
+        "transicion": "Transición",
+        "transición": "Transición",
+    }
+
+    tokens = texto.split(" ")
+    out = []
+    for i, tok in enumerate(tokens):
+        clave = tok.lower()
+        if clave in reemplazos:
+            out.append(reemplazos[clave])
+        elif i == len(tokens) - 1 and len(tok) == 1 and tok.isalpha():
+            # Letra de curso al final: a -> A
+            out.append(tok.upper())
+        else:
+            out.append(tok)
+    return " ".join(out)

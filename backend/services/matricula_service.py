@@ -19,7 +19,7 @@ from services.email_service import (
     enviar_correo_solicitud_cambio_curso,
     enviar_correo_confirmacion_cambio_curso
 )
-from services.utils import determinar_nivel_backend
+from services.utils import determinar_nivel_backend, normalizar_texto_curso
 from services import storage_service
 from services.establecimientos_service import obtener_capacidad_curso
 import unicodedata
@@ -423,6 +423,11 @@ def crear_nueva_matricula_db(matricula):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # Normalizar el texto del curso a su forma canónica ANTES de usarlo en el lock,
+        # el correlativo y el INSERT. Evita duplicados tipo '8° básico A' vs '8° Básico A'
+        # entre la matrícula manual y la carga masiva SIGE (ambas comparten el canónico).
+        if getattr(matricula, 'curso', None):
+            matricula.curso = normalizar_texto_curso(matricula.curso)
         # Bloqueo a nivel de transacción para prevenir carreras concurrentes en el mismo curso/colegio/año
         clave_bloqueo = f"{matricula.id_establecimiento}-{matricula.anio_escolar}-{matricula.curso}"
         cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (clave_bloqueo,))
@@ -813,7 +818,7 @@ def guardar_respuesta_cuestionario_curso_db(id_matricula: int, payload):
         if motivo_actual.startswith("PENDIENTE_TRASLADO|"):
             partes = motivo_actual.split("|")
             nuevo_cod = int(partes[1])
-            nuevo_curso = partes[2]
+            nuevo_curso = normalizar_texto_curso(partes[2])
         else:
             # Si ya fue trasladado previamente o formato legacy, solo guardar motivo
             cur.execute("UPDATE matricula SET motivo_cambio_curso = %s WHERE id_matricula = %s", (payload.motivo_real, id_matricula))
@@ -967,7 +972,7 @@ def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = Non
         anio_escolar = datos[0]
         folio_antiguo = datos[6]
         nuevo_cod = req.cod_tipo_ensenanza
-        nuevo_curso = req.nuevo_curso
+        nuevo_curso = normalizar_texto_curso(req.nuevo_curso)
         motivo = (getattr(req, "motivo_cambio_curso", None) or "").strip() or None
 
         # Bloqueo atómico por curso/colegio/año para que el folio no colisione aunque
@@ -1198,6 +1203,7 @@ async def procesar_carga_masiva_db(archivos, usuario_actual):
                     id_estudiante = cur.fetchone()[0]
 
                 curso_texto = f"{desc_grado} {letra_curso}".strip() if desc_grado else "Sin Asignar"
+                curso_texto = normalizar_texto_curso(curso_texto)
                 nivel_calculado = determinar_nivel_backend(curso_texto, cod_ensenanza)
                 
                 # Verificar si el alumno ya tiene matrícula previa en este establecimiento y año
