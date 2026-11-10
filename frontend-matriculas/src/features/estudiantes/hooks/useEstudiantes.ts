@@ -3,6 +3,8 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config/api';
 import { coincideBusqueda } from '../../../utils/search';
 import { useToast } from '../../../components/Toast';
+import { PARENTESCO_REQUIERE_DOCUMENTO, validarParentesco } from '../../../config/parentescos';
+import { validarCorreoInstitucional, validarCorreoPersonal } from '../../../config/reglasEstudiante';
 
 export interface NuevoEstudianteForm {
   run: string;
@@ -85,7 +87,7 @@ const ESTUDIANTE_INICIAL: NuevoEstudianteForm = {
 
   tiene_suplente: false,
   run_suplente: '', nombres_suplente: '', apellido_paterno_suplente: '', apellido_materno_suplente: '',
-  domicilio_suplente: '', telefono_suplente: '', correo_suplente: '', relacion_suplente: 'Familiar',
+  domicilio_suplente: '', telefono_suplente: '', correo_suplente: '', relacion_suplente: '',
 
   sistema_salud: 'FONASA', letra_fonasa: 'A', cesfam: '', centro_emergencia: '',
   diagnostico_medico: 'No', medico_tratante: '', medicamento: '', alergias: '', nee: 'No', nee_tipo: 'No aplica'
@@ -436,6 +438,9 @@ export const useEstudiantes = () => {
         numero: datos.personal?.numero || '',
         sector: datos.personal?.sector || '',
         comuna: datos.personal?.comuna || '',
+        // Correo del estudiante (personal vs institucional)
+        correo_personal: datos.personal?.correo_personal || '',
+        correo_institucional: datos.personal?.correo_institucional || '',
         
         // Titular
         rut_apoderado: datos.apoderado?.rut && datos.apoderado.rut !== 'Sin registrar' ? datos.apoderado.rut : '',
@@ -456,7 +461,7 @@ export const useEstudiantes = () => {
         domicilio_suplente: datos.apoderado_suplente?.domicilio || '',
         telefono_suplente: datos.apoderado_suplente?.telefono && datos.apoderado_suplente.telefono !== '-' ? datos.apoderado_suplente.telefono : '',
         correo_suplente: datos.apoderado_suplente?.correo && datos.apoderado_suplente.correo !== '-' ? datos.apoderado_suplente.correo : '',
-        relacion_suplente: datos.apoderado_suplente?.relacion || 'Familiar',
+        relacion_suplente: datos.apoderado_suplente?.relacion || '',
 
         // Salud
         sistema_salud: datos.salud?.sistema_salud || 'FONASA',
@@ -494,6 +499,29 @@ export const useEstudiantes = () => {
       return;
     }
 
+    // Parentesco: mismo catálogo y misma regla que el backend. Los valores históricos
+    // (no incluidos en el catálogo) se aceptan solo si son idénticos al ya guardado.
+    const errParentesco =
+      validarParentesco(datosEdicion.relacion_apoderado, datosEstudiante?.apoderado?.relacion, 'El parentesco del apoderado titular') ||
+      (datosEdicion.tiene_suplente
+        ? validarParentesco(datosEdicion.relacion_suplente, datosEstudiante?.apoderado_suplente?.relacion, 'El parentesco del apoderado suplente')
+        : null);
+    if (errParentesco) {
+      toast.warning(errParentesco);
+      return;
+    }
+
+    // Correo del estudiante: formato siempre; obligatorio según el nivel (regla
+    // parametrizada en config/reglasEstudiante.ts, la misma que el backend).
+    const cursoReciente = (datosEstudiante?.historial || []).find((h: any) => h.estado !== 'Anulada')?.curso;
+    const errCorreo =
+      validarCorreoPersonal(datosEdicion.correo_personal, cursoReciente) ||
+      validarCorreoInstitucional(datosEdicion.correo_institucional);
+    if (errCorreo) {
+      toast.warning(errCorreo);
+      return;
+    }
+
     setGuardandoEdicion(true);
     const token = localStorage.getItem('token');
     try {
@@ -506,6 +534,9 @@ export const useEstudiantes = () => {
         sector: (datosEdicion.sector || '').trim(),
         comuna: (datosEdicion.comuna || '').trim(),
         domicilio_estudiante: datosEdicion.domicilio || "Sin registrar",
+        // Correo del estudiante
+        correo_personal: (datosEdicion.correo_personal || '').trim(),
+        correo_institucional: (datosEdicion.correo_institucional || '').trim(),
         
         // Titular
         rut_apoderado: datosEdicion.rut_apoderado,
@@ -618,7 +649,7 @@ export const useEstudiantes = () => {
     } else if (pasoCrear === 2) {
       const esIpa = nuevoEstudiante.run_apoderado.replace(/[^0-9kK]/g, '').length >= 10;
       if (!nuevoEstudiante.relacion_estudiante) { toast.warning("Seleccione el parentesco del Apoderado Titular."); return; }
-      if (nuevoEstudiante.relacion_estudiante === 'Tutor Legal Designado' && !archivoTutor) {
+      if (nuevoEstudiante.relacion_estudiante === PARENTESCO_REQUIERE_DOCUMENTO && !archivoTutor) {
         toast.warning("Debe adjuntar el documento que acredite la tutoría legal.");
         return;
       }
@@ -674,7 +705,7 @@ export const useEstudiantes = () => {
       }
 
       // Si el apoderado es tutor legal designado y se adjuntó archivo, subirlo
-      if (nuevoEstudiante.relacion_estudiante === 'Tutor Legal Designado' && archivoTutor) {
+      if (nuevoEstudiante.relacion_estudiante === PARENTESCO_REQUIERE_DOCUMENTO && archivoTutor) {
         try {
           const formArchivo = new FormData();
           formArchivo.append('archivo', archivoTutor);

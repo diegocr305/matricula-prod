@@ -102,6 +102,10 @@ class ActualizarEstudianteRequest(BaseModel):
     correo_suplente: Optional[str] = None
     relacion_suplente: Optional[str] = None
 
+    # 1b. Correo del estudiante (None = no se modifica)
+    correo_personal: Optional[str] = None
+    correo_institucional: Optional[str] = None
+
     # 4. Ficha Médica
     actualizar_salud: Optional[bool] = False
     sistema_salud: Optional[str] = None

@@ -44,13 +44,13 @@ export default function Inicio() {
             <div className="w-11 h-11 bg-blue-50 text-blue-900 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <FolderOpen size={24} />
             </div>
-            <h2 className="text-base font-bold text-gray-800 mb-2">Gestión de Matrículas</h2>
+            <h2 className="text-base font-bold text-gray-800 mb-2">Admisión Escolar</h2>
             <p className="text-xs text-gray-500 leading-relaxed">
               Inscriba nuevos alumnos, registre retiros oficiales, procese traslados de curso y emita certificados institucionales en formato PDF.
             </p>
           </div>
           <div className="bg-gray-50 p-4 border-t border-gray-100 flex justify-between items-center text-blue-800 font-bold text-sm group-hover:bg-blue-900 group-hover:text-white transition-colors">
-            <span>Ir a Matrículas</span>
+            <span>Ir a Admisión Escolar</span>
             <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>

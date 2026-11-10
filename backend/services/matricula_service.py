@@ -25,6 +25,61 @@ from services.establecimientos_service import obtener_capacidad_curso
 import unicodedata
 import re
 
+import roles as roles_catalogo
+
+
+def _es_usuario_acotado(usuario_actual) -> bool:
+    """True si el usuario esta limitado a su propio establecimiento.
+
+    Usa el catalogo central de roles (roles.py): todo rol que NO sea de nivel
+    central SLEP queda acotado, incluidos Matriculador, Director, variantes de
+    mayusculas y cualquier rol desconocido (seguro por defecto). Antes se
+    comparaba contra la lista exacta ["Colegio", "Visualizador_Colegio"], lo que
+    dejaba sin restriccion a los demas roles de colegio.
+    """
+    if not usuario_actual:
+        return False
+    return not roles_catalogo.es_slep(usuario_actual.get("rol"))
+
+
+ESTADOS_PREMATRICULA_PENDIENTE = ("Por renovar", "Pendiente firma")
+
+
+def detectar_prematricula_pendiente(matriculas_previas, anio_escolar, id_establecimiento):
+    """Devuelve un mensaje si existe una pre-matrícula pendiente del MISMO año y
+    establecimiento (filas de crear_nueva_matricula_db: [0]=id, [1]=curso, [4]=año,
+    [6]=id_establecimiento, [11]=estado_renovacion). None si no hay conflicto."""
+    for mp in matriculas_previas:
+        if (len(mp) > 11 and mp[4] == anio_escolar and mp[6] == id_establecimiento
+                and mp[11] in ESTADOS_PREMATRICULA_PENDIENTE):
+            return (
+                f"El estudiante ya tiene una pre-matrícula {anio_escolar} en este establecimiento "
+                f"(curso '{mp[1]}', estado '{mp[11]}'). Use 'Confirmar renovación' sobre esa matrícula "
+                f"en lugar de registrar una nueva, para no duplicarla."
+            )
+    return None
+
+
+def verificar_acceso_matricula_db(id_matricula: int, usuario_actual) -> None:
+    """Lanza 404/403 si el usuario (de colegio) intenta operar una matricula que no
+    pertenece a su establecimiento. Los usuarios SLEP pasan sin restriccion."""
+    if not _es_usuario_acotado(usuario_actual):
+        return
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id_establecimiento FROM matricula WHERE id_matricula = %s", (id_matricula,))
+        fila = cur.fetchone()
+        if not fila:
+            raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
+        id_est_user = usuario_actual.get("id_establecimiento")
+        if not id_est_user or fila[0] != id_est_user:
+            raise HTTPException(status_code=403, detail="No tiene permisos sobre matrículas de otro establecimiento.")
+    finally:
+        cur.close()
+        conn.close()
+
+
 def normalizar_texto_curso(t: str) -> str:
     if not t: return ''
     nfkd = unicodedata.normalize('NFKD', str(t))
@@ -257,9 +312,9 @@ def confirmar_renovacion_db(id_matricula: int, usuario_actual: dict):
         id_est, estado_renov, anio, run_ipe, id_apod_ppal, id_apod_supl = fila
 
         # Permisos: un colegio solo confirma matriculas de su establecimiento.
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and id_est != id_est_user:
+            if not id_est_user or id_est != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para confirmar esta matrícula.")
 
         # Idempotencia: si ya esta en 'Pendiente firma' o 'Firmada', no re-procesa.
@@ -314,9 +369,9 @@ def guardar_documento_resolucion_db(id_matricula: int, archivo_bytes: bytes, fil
             raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
         
         # Validar permisos
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and mat[0] != id_est_user:
+            if not id_est_user or mat[0] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta matrícula.")
 
         ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
@@ -348,9 +403,9 @@ def obtener_ruta_documento_resolucion_db(id_matricula: int, usuario_actual: dict
         if not mat:
             raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
 
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and mat[0] != id_est_user:
+            if not id_est_user or mat[0] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para consultar esta matrícula.")
 
         if not mat[1]:
@@ -371,9 +426,9 @@ def guardar_documento_traslado_db(id_matricula: int, archivo_bytes: bytes, filen
             raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
         
         # Validar permisos
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and mat[0] != id_est_user:
+            if not id_est_user or mat[0] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta matrícula.")
 
         ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
@@ -405,9 +460,9 @@ def obtener_ruta_documento_traslado_db(id_matricula: int, usuario_actual: dict) 
         if not mat:
             raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
 
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and mat[0] != id_est_user:
+            if not id_est_user or mat[0] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para consultar esta matrícula.")
 
         if not mat[1]:
@@ -441,13 +496,23 @@ def crear_nueva_matricula_db(matricula):
         # 1. Validar antecedentes del estudiante: no permitir matricular en un curso inferior al ya cursado
         cursor.execute("""
             SELECT m.id_matricula, m.curso, m.nivel_ensenanza, m.cod_grado, m.anio_escolar, m.estado,
-                   m.id_establecimiento, est.nombre, est.rbd, m.fecha_retiro, m.observaciones
+                   m.id_establecimiento, est.nombre, est.rbd, m.fecha_retiro, m.observaciones,
+                   m.estado_renovacion
             FROM matricula m
             LEFT JOIN establecimiento est ON m.id_establecimiento = est.id_establecimiento
             WHERE m.id_estudiante = %s AND m.estado != 'Anulada'
             ORDER BY m.anio_escolar DESC, m.fecha_matricula DESC NULLS LAST, m.id_matricula DESC
         """, (matricula.id_estudiante,))
         matriculas_previas = cursor.fetchall()
+
+        # Continuidad: si el estudiante ya tiene una PRE-MATRÍCULA del mismo año en este
+        # establecimiento (pendiente de confirmar o de firma), no se crea otra ni se anula
+        # en silencio. Se debe usar "Confirmar renovación" sobre la existente.
+        conflicto = detectar_prematricula_pendiente(
+            matriculas_previas, matricula.anio_escolar, matricula.id_establecimiento
+        )
+        if conflicto:
+            raise HTTPException(status_code=409, detail=conflicto)
 
         rank_solicitado = obtener_rango_curso(
             matricula.curso, 
@@ -615,9 +680,9 @@ def actualizar_estado_matricula_db(id_matricula: int, matricula, usuario_actual:
         if not mat_row:
             raise HTTPException(status_code=404, detail="Matrícula no encontrada")
 
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and mat_row[0] != id_est_user:
+            if not id_est_user or mat_row[0] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para modificar matrículas de otro establecimiento.")
 
         mensaje_alerta = ""
@@ -938,9 +1003,9 @@ def registrar_cambio_curso_db(id_matricula: int, req, usuario_actual: dict = Non
                        f"Curso actual: '{curso_actual}', curso solicitado: '{req.nuevo_curso}'."
             )
 
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and id_establecimiento != id_est_user:
+            if not id_est_user or id_establecimiento != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para cambiar curso a estudiantes de otro establecimiento.")
 
         # VALIDAR CAPACIDAD DE SALA ANTES DE REGISTRAR SOLICITUD
@@ -1036,9 +1101,9 @@ def generar_pdf_certificado_db(id_matricula: int, tipo: str, usuario_actual: dic
         
         if not datos: raise HTTPException(status_code=404, detail="Matrícula no encontrada")
         
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and datos[20] != id_est_user:
+            if not id_est_user or datos[20] != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para descargar certificados de otro establecimiento.")
 
         # Candado: no se puede emitir el documento de una matrícula en renovación
@@ -1387,11 +1452,20 @@ def obtener_opciones_filtro_excel(id_establecimiento: int = None):
             key = str(cod_plan)
             cursos_por_plan.setdefault(key, []).append(curso)
 
+        # Niveles de enseñanza (para el Libro de Matrícula). Campo aditivo: los
+        # consumidores antiguos lo ignoran.
+        cur.execute(
+            f"SELECT DISTINCT nivel_ensenanza FROM matricula {filtro_est} ORDER BY nivel_ensenanza ASC",
+            params
+        )
+        niveles = [r[0] for r in cur.fetchall() if r[0]]
+
         return {
             "anios": anios,
             "cursos": cursos,
             "planes": planes,
-            "cursos_por_plan": cursos_por_plan
+            "cursos_por_plan": cursos_por_plan,
+            "niveles": niveles,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al obtener opciones de filtro: " + str(e))
@@ -1471,7 +1545,7 @@ def obtener_estudiantes_curso_db(id_establecimiento: int, anio: int, curso: str)
         conn.close()
 
 
-def exportar_matriculas_excel_service(id_establecimiento: int = None, anio: str = None, codigo_plan: str = None, curso: str = None):
+def exportar_matriculas_excel_service(id_establecimiento: int = None, anio: str = None, codigo_plan: str = None, curso: str = None, contador: list = None):
     """
     Extrae las matrículas con TODA la información disponible del alumno, apoderados
     y ficha de salud, y genera un libro Excel (.xlsx) con 4 pestañas organizadas.
@@ -1567,6 +1641,8 @@ def exportar_matriculas_excel_service(id_establecimiento: int = None, anio: str 
 
         cur.execute(query, tuple(params))
         filas = cur.fetchall()
+        if contador is not None:
+            contador.append(len(filas))
 
         # ---------------------------------------------------------------
         # 2. Crear libro Excel con estilo de cabeceras
@@ -1812,9 +1888,9 @@ def obtener_detalle_motivo_matricula_db(id_matricula: int, usuario_actual: dict 
             raise HTTPException(status_code=404, detail="Matrícula no encontrada.")
 
         id_establecimiento = row[11]
-        if usuario_actual and usuario_actual.get("rol") in ["Colegio", "Visualizador_Colegio"]:
+        if _es_usuario_acotado(usuario_actual):
             id_est_user = usuario_actual.get("id_establecimiento")
-            if id_est_user and id_establecimiento != id_est_user:
+            if not id_est_user or id_establecimiento != id_est_user:
                 raise HTTPException(status_code=403, detail="No tiene permisos para ver detalles de matrículas de otro establecimiento.")
 
         # Consultar encuesta de retiro si existe

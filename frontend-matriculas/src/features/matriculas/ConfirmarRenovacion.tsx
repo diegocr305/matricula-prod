@@ -4,6 +4,8 @@ import { UserCheck, Home, HeartPulse, Loader2, AlertTriangle, ChevronLeft, Copy,
 import { API_BASE_URL } from '../../config/api';
 import { ModalExito } from './components/ModalExito';
 import Stepper from '../../components/Stepper';
+import SelectParentesco from '../../components/SelectParentesco';
+import { correoPersonalEsObligatorio, validarCorreoPersonal } from '../../config/reglasEstudiante';
 
 // Pantalla de "Confirmar Renovación" (Opcion A del piloto):
 // El apoderado viene presencialmente, el funcionario ACTUALIZA sus datos y los del
@@ -68,8 +70,9 @@ export default function ConfirmarRenovacion() {
   const [anio, setAnio] = useState<number | string>(stateNav.anio || '');
 
   const [domEstudiante, setDomEstudiante] = useState<DomicilioForm>(domicilioVacio);
+  const [correoPersonal, setCorreoPersonal] = useState('');
   const [apoderado, setApoderado] = useState<ApoderadoForm>(apoderadoVacio);
-  const [suplente, setSuplente] = useState<ApoderadoForm>({ ...apoderadoVacio, relacion: 'Padre' });
+  const [suplente, setSuplente] = useState<ApoderadoForm>({ ...apoderadoVacio, relacion: '' });
   const [tieneSuplente, setTieneSuplente] = useState(false);
   const [salud, setSalud] = useState<SaludForm>(saludVacia);
   const [actualizarSalud, setActualizarSalud] = useState(false);
@@ -102,6 +105,7 @@ export default function ConfirmarRenovacion() {
         setDomEstudiante({
           calle: p.calle || '', numero: p.numero || '', sector: p.sector || '', comuna: p.comuna || '',
         });
+        setCorreoPersonal(p.correo_personal || '');
         setApoderado({
           rut: a.rut_raw || a.rut || '',
           nombres: a.nombres || '',
@@ -122,7 +126,7 @@ export default function ConfirmarRenovacion() {
             apellido_materno: sup.apellido_materno || '',
             telefono: (sup.telefono && sup.telefono !== '-') ? sup.telefono : '',
             correo: (sup.correo && sup.correo !== '-') ? sup.correo : '',
-            relacion: sup.relacion || 'Padre',
+            relacion: sup.relacion || '',
             calle: sup.calle || '', numero: sup.numero || '', sector: sup.sector || '', comuna: sup.comuna || '',
           });
         }
@@ -154,6 +158,8 @@ export default function ConfirmarRenovacion() {
     if (!domEstudiante.calle.trim() || !domEstudiante.numero.trim() || !domEstudiante.comuna.trim()) {
       return 'Complete el domicilio del estudiante: calle, número y comuna son obligatorios.';
     }
+    const errCorreo = validarCorreoPersonal(correoPersonal, curso);
+    if (errCorreo) return errCorreo;
     if (!apoderado.rut.trim()) return 'Ingrese el RUT del apoderado.';
     if (!apoderado.nombres.trim() || !apoderado.apellido_paterno.trim()) {
       return 'Complete nombres y apellido paterno del apoderado.';
@@ -183,6 +189,8 @@ export default function ConfirmarRenovacion() {
         // Domicilio estudiante (desglosado)
         calle: domEstudiante.calle, numero: domEstudiante.numero,
         sector: domEstudiante.sector, comuna: domEstudiante.comuna,
+        // Correo personal del estudiante
+        correo_personal: correoPersonal.trim(),
         // Apoderado titular
         rut_apoderado: apoderado.rut,
         nombres_apoderado: apoderado.nombres,
@@ -264,7 +272,7 @@ export default function ConfirmarRenovacion() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       <button onClick={() => navigate('/matriculas')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-        <ChevronLeft size={16} /> Volver a Matrículas
+        <ChevronLeft size={16} /> Volver a Admisión Escolar
       </button>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -321,6 +329,25 @@ export default function ConfirmarRenovacion() {
             <label className={labelCls}>Comuna <span className="text-red-500">*</span></label>
             <input className={inputCls} value={domEstudiante.comuna} onChange={(e) => setDomEstudiante({ ...domEstudiante, comuna: e.target.value })} placeholder="Ej: Valparaíso" />
           </div>
+          <div className="md:col-span-2">
+            <label className={labelCls} htmlFor="correo-personal-estudiante">
+              Correo personal del estudiante{' '}
+              {correoPersonalEsObligatorio(curso)
+                ? <span className="text-red-500">*</span>
+                : <span className="text-gray-400 font-normal">(opcional)</span>}
+            </label>
+            <input
+              id="correo-personal-estudiante"
+              type="email"
+              className={inputCls}
+              value={correoPersonal}
+              onChange={(e) => setCorreoPersonal(e.target.value)}
+              placeholder="correo.personal@ejemplo.com"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Correo propio del estudiante (no el del apoderado ni el institucional). Se usa para la trazabilidad de egresados.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -337,10 +364,7 @@ export default function ConfirmarRenovacion() {
           </div>
           <div>
             <label className={labelCls}>Parentesco</label>
-            <select className={inputCls} value={apoderado.relacion} onChange={(e) => setApoderado({ ...apoderado, relacion: e.target.value })}>
-              <option>Madre</option><option>Padre</option><option>Abuelo/a</option>
-              <option>Tutor Legal</option><option>Otro</option>
-            </select>
+            <SelectParentesco className={inputCls} value={apoderado.relacion} onChange={(e) => setApoderado({ ...apoderado, relacion: e.target.value })} />
           </div>
           <div>
             <label className={labelCls}>Nombres <span className="text-red-500">*</span></label>
@@ -423,10 +447,7 @@ export default function ConfirmarRenovacion() {
               </div>
               <div>
                 <label className={labelCls}>Parentesco</label>
-                <select className={inputCls} value={suplente.relacion} onChange={(e) => setSuplente({ ...suplente, relacion: e.target.value })}>
-                  <option>Madre</option><option>Padre</option><option>Abuelo/a</option>
-                  <option>Tutor Legal</option><option>Otro</option>
-                </select>
+                <SelectParentesco className={inputCls} value={suplente.relacion} onChange={(e) => setSuplente({ ...suplente, relacion: e.target.value })} placeholder="Seleccione parentesco..." />
               </div>
               <div>
                 <label className={labelCls}>Nombres <span className="text-red-500">*</span></label>

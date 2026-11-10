@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../../../config/api';
 import { coincideBusqueda } from '../../../utils/search';
 import { useToast } from '../../../components/Toast';
 import { obtenerRangoCurso } from '../../../utils/gradeHierarchy';
+import { esCorreoValido } from '../../../config/reglasEstudiante';
 
 export interface MatriculaBase {
   id_establecimiento: number;
@@ -131,6 +132,9 @@ export const useNuevaMatricula = () => {
 
   const [formFaltantes, setFormFaltantes] = useState({
     domicilio_estudiante: '',
+    // Correo personal del estudiante + si es obligatorio por nivel (lo informa el backend).
+    correo_personal: '',
+    correo_personal_obligatorio: false,
     rut_apoderado: '',
     nombres_apoderado: '',
     apellido_paterno_apoderado: '',
@@ -148,7 +152,7 @@ export const useNuevaMatricula = () => {
     domicilio_suplente: '',
     telefono_suplente: '',
     correo_suplente: '',
-    relacion_suplente: 'Suplente'
+    relacion_suplente: ''
   });
 
   const handleFaltantesChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -674,10 +678,12 @@ export const useNuevaMatricula = () => {
     const telSup = datos.apoderado_suplente?.telefono && datos.apoderado_suplente.telefono !== '-' ? datos.apoderado_suplente.telefono : '';
     const corSup = datos.apoderado_suplente?.correo && datos.apoderado_suplente.correo !== '-' ? datos.apoderado_suplente.correo : '';
     const domSup = datos.apoderado_suplente?.domicilio || '';
-    const relSup = datos.apoderado_suplente?.relacion || datos.apoderado_suplente?.relacion_estudiante || 'Suplente';
+    const relSup = datos.apoderado_suplente?.relacion || datos.apoderado_suplente?.relacion_estudiante || '';
 
     setFormFaltantes({
       domicilio_estudiante: domEst,
+      correo_personal: personal.correo_personal || '',
+      correo_personal_obligatorio: Boolean(personal.correo_personal_obligatorio),
       rut_apoderado: rutAp !== 'Sin registrar' ? rutAp : '',
       nombres_apoderado: nombresApVal !== 'Pendiente' ? nombresApVal : '',
       apellido_paterno_apoderado: patApVal,
@@ -708,6 +714,7 @@ export const useNuevaMatricula = () => {
     if (!corAp || corAp === "-") faltan.push("Correo del Apoderado");
     if (!domAp) faltan.push("Domicilio del Apoderado");
     if (!relAp) faltan.push("Parentesco del Apoderado");
+    if (personal.correo_personal_obligatorio && !personal.correo_personal) faltan.push("Correo personal del Estudiante (4° medio)");
 
     setDatosFaltantes(faltan);
 
@@ -826,11 +833,25 @@ export const useNuevaMatricula = () => {
   const guardarDatosFaltantes = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!estudiante) return;
+
+    // Correo personal: misma regla parametrizada que el backend (config/reglasEstudiante.ts).
+    const correoPersonal = (formFaltantes.correo_personal || '').trim();
+    if (formFaltantes.correo_personal_obligatorio && !correoPersonal) {
+      toast.warning('El correo personal del estudiante es obligatorio en 4° medio.');
+      return;
+    }
+    if (correoPersonal && !esCorreoValido(correoPersonal)) {
+      toast.warning(`El correo personal del estudiante no tiene un formato válido: "${correoPersonal}".`);
+      return;
+    }
+
     setGuardandoFaltantes(true);
 
     try {
       const token = localStorage.getItem('token');
       const rutVal = estudiante.run || estudiante.run_ipe;
+      // El indicador de obligatoriedad es solo de pantalla: no se envía al backend.
+      const { correo_personal_obligatorio: _omitir, ...payload } = formFaltantes;
       
       const respuesta = await fetch(`${API_BASE_URL}/estudiante/${rutVal}`, {
         method: 'PUT',
@@ -838,10 +859,13 @@ export const useNuevaMatricula = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify(formFaltantes) 
+        body: JSON.stringify({ ...payload, correo_personal: correoPersonal })
       });
 
-      if (!respuesta.ok) throw new Error('Error al guardar la información');
+      if (!respuesta.ok) {
+        const err = await respuesta.json().catch(() => ({}));
+        throw new Error(typeof err.detail === 'string' ? err.detail : 'Error al guardar la información');
+      }
       
       const timestamp = new Date().getTime();
       const refreshRes = await fetch(`${API_BASE_URL}/estudiante/${rutVal}?t=${timestamp}`, {

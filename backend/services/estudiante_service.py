@@ -6,6 +6,98 @@ from database import get_db_connection
 import json
 from services import storage_service
 from services.utils import normalizar_rut
+from parentescos import validar_parentesco
+from reglas_estudiante import correo_personal_es_obligatorio, validar_formato_correo
+import re
+
+
+def normalizar_numero_domicilio(numero):
+    """Limpia espacios del número de domicilio y unifica 'sin número' como 'S/N'
+    (acepta 's/n', 'sn', 'S / N', 'sin numero'). Devuelve None si queda vacío."""
+    if numero is None:
+        return None
+    n = " ".join(str(numero).split())
+    if not n:
+        return None
+    if re.fullmatch(r"(?i)s\s*/?\s*n\.?|sin\s+n[uú]mero", n):
+        return "S/N"
+    return n
+
+
+def _domicilio_guardado(cur, id_apoderado):
+    """Domicilio ya guardado de un apoderado, o None si no hay uno útil.
+    Se usa para NO pisar con el del estudiante un domicilio que ya estaba bien."""
+    if not id_apoderado:
+        return None
+    cur.execute("SELECT domicilio FROM apoderado WHERE id_apoderado = %s", (id_apoderado,))
+    fila = cur.fetchone()
+    valor = (fila[0] or "").strip() if fila else ""
+    if not valor or valor.lower() in ("sin registrar", "sin registro"):
+        return None
+    return valor
+
+
+_COLUMNAS_CORREO_OK = False
+
+
+def _tiene_columnas_correo(cur) -> bool:
+    """True si ya se aplicó apply_correo_estudiante_migration.py.
+    Permite desplegar el código antes que la migración sin romper la ficha:
+    mientras no existan las columnas, el correo simplemente no se lee ni se exige.
+    Solo se cachea el resultado positivo (para detectar la migración sin reiniciar)."""
+    global _COLUMNAS_CORREO_OK
+    if _COLUMNAS_CORREO_OK:
+        return True
+    cur.execute("""
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'estudiante'
+          AND column_name IN ('correo_personal', 'correo_institucional')
+    """)
+    _COLUMNAS_CORREO_OK = cur.fetchone()[0] == 2
+    return _COLUMNAS_CORREO_OK
+
+
+def _guardar_correo_estudiante(cur, id_estudiante, nuevo_personal, nuevo_institucional):
+    """Aplica la obligatoriedad por nivel y guarda el correo del estudiante.
+    La obligatoriedad se evalúa sobre el valor final: el enviado o, si no se envía
+    (None), el ya guardado. Requiere las columnas de la migración de correo."""
+    cur.execute("SELECT correo_personal FROM estudiante WHERE id_estudiante = %s", (id_estudiante,))
+    fila = cur.fetchone()
+    guardado = (fila[0] if fila else None) or ""
+    personal_final = nuevo_personal.strip() if nuevo_personal is not None else guardado
+
+    cur.execute("""
+        SELECT curso FROM matricula
+        WHERE id_estudiante = %s AND estado <> 'Anulada'
+        ORDER BY anio_escolar DESC, id_matricula DESC LIMIT 1
+    """, (id_estudiante,))
+    fila_curso = cur.fetchone()
+    if correo_personal_es_obligatorio(fila_curso[0] if fila_curso else None) and not personal_final:
+        raise HTTPException(status_code=422, detail="El correo personal del estudiante es obligatorio en 4° medio.")
+
+    if nuevo_personal is not None:
+        cur.execute("UPDATE estudiante SET correo_personal = %s WHERE id_estudiante = %s",
+                    (nuevo_personal.strip() or None, id_estudiante))
+    if nuevo_institucional is not None:
+        cur.execute("UPDATE estudiante SET correo_institucional = %s WHERE id_estudiante = %s",
+                    (nuevo_institucional.strip() or None, id_estudiante))
+
+
+def _relaciones_guardadas(cur, id_apoderado=None, rut=None):
+    """Valores de parentesco ya guardados para un apoderado (por id y/o por RUT).
+    Sirven para aceptar sin reescribir los valores históricos que no están en el catálogo."""
+    vistos = []
+    if id_apoderado:
+        cur.execute("SELECT relacion_estudiante FROM apoderado WHERE id_apoderado = %s", (id_apoderado,))
+        fila = cur.fetchone()
+        if fila and fila[0]:
+            vistos.append(fila[0])
+    if rut:
+        cur.execute("SELECT relacion_estudiante FROM apoderado WHERE rut_pasaporte = %s", (rut,))
+        fila = cur.fetchone()
+        if fila and fila[0]:
+            vistos.append(fila[0])
+    return vistos
 
 def componer_domicilio(calle, numero, sector, comuna):
     """Compone una dirección en un solo texto a partir de sus componentes."""
@@ -300,7 +392,13 @@ def obtener_ficha_estudiante_db(rut: str, usuario_actual: dict = None):
         if usuario_actual:
             verificar_acceso_estudiante_db(rut, usuario_actual, cur)
 
-        cur.execute("""
+        # Columnas de correo solo si la migración ya se aplicó (si no, NULL en su lugar
+        # para no mover los índices posicionales 44 y 45).
+        cols_correo = (
+            "e.correo_personal, e.correo_institucional"
+            if _tiene_columnas_correo(cur) else "NULL, NULL"
+        )
+        cur.execute(f"""
             SELECT e.id_estudiante, e.run_ipe, e.nombres, e.apellido_paterno, e.apellido_materno, e.fecha_nacimiento, e.domicilio,
                    a.rut_pasaporte, a.nombres, a.apellido_paterno, a.apellido_materno, a.telefono, a.correo_electronico, a.domicilio, a.relacion_estudiante, a.ruta_documento_tutor,
                    asup.rut_pasaporte, asup.nombres, asup.apellido_paterno, asup.apellido_materno, asup.telefono, asup.correo_electronico, asup.domicilio, asup.relacion_estudiante,
@@ -309,7 +407,8 @@ def obtener_ficha_estudiante_db(rut: str, usuario_actual: dict = None):
                     e.fecha_actualizacion,
                     e.pais_origen, e.documento_extranjero,
                     a.pais_origen, a.documento_extranjero,
-                    e.calle, e.numero, e.sector, e.comuna
+                    e.calle, e.numero, e.sector, e.comuna,
+                    {cols_correo}
             FROM estudiante e
             LEFT JOIN apoderado a ON e.id_apoderado_principal = a.id_apoderado
             LEFT JOIN apoderado asup ON e.id_apoderado_suplente = asup.id_apoderado
@@ -355,7 +454,14 @@ def obtener_ficha_estudiante_db(rut: str, usuario_actual: dict = None):
                 "colegio_actual": ultimo_colegio,
                 "fecha_actualizacion": str(estudiante_db[35]) if len(estudiante_db) > 35 and estudiante_db[35] else None,
                 "pais_origen": estudiante_db[36] if len(estudiante_db) > 36 and estudiante_db[36] else "Chile",
-                "documento_extranjero": estudiante_db[37] if len(estudiante_db) > 37 else None
+                "documento_extranjero": estudiante_db[37] if len(estudiante_db) > 37 else None,
+                # Correo del estudiante (columnas agregadas al FINAL del SELECT: 44, 45).
+                "correo_personal": estudiante_db[44] or "",
+                "correo_institucional": estudiante_db[45] or "",
+                # Regla parametrizada (reglas_estudiante.py) según el curso más reciente.
+                "correo_personal_obligatorio": _COLUMNAS_CORREO_OK and correo_personal_es_obligatorio(
+                    next((h[3] for h in historial_db if h[4] != "Anulada"), None)
+                ),
             },
             "apoderado": {
                 "rut": estudiante_db[7] if estudiante_db[7] else "Sin registrar",
@@ -383,7 +489,7 @@ def obtener_ficha_estudiante_db(rut: str, usuario_actual: dict = None):
                 "telefono": estudiante_db[20] if estudiante_db[20] else "-",
                 "correo": estudiante_db[21] if estudiante_db[21] else "-",
                 "domicilio": estudiante_db[22] if estudiante_db[22] else "",
-                "relacion": estudiante_db[23] or "Suplente"
+                "relacion": estudiante_db[23] or ""
             } if estudiante_db[16] else None,
             "salud": {
                 "sistema_salud": estudiante_db[25] or "No informado",
@@ -484,6 +590,20 @@ def crear_estudiante_db(payload: dict):
     try:
         # 1. Procesar Apoderado Principal
         run_apod = normalizar_rut(payload.get("run_apoderado"))
+
+        # Validación de parentesco (catálogo único) ANTES de escribir nada.
+        validar_parentesco(
+            payload.get("relacion_estudiante"),
+            _relaciones_guardadas(cur, rut=run_apod),
+            "Parentesco del apoderado titular",
+        )
+        if payload.get("tiene_suplente") and payload.get("run_suplente"):
+            validar_parentesco(
+                payload.get("relacion_suplente"),
+                _relaciones_guardadas(cur, rut=normalizar_rut(payload.get("run_suplente"))),
+                "Parentesco del apoderado suplente",
+            )
+
         cur.execute("SELECT id_apoderado FROM apoderado WHERE rut_pasaporte = %s", (run_apod,))
         apod_db = cur.fetchone()
         
@@ -607,6 +727,10 @@ def crear_estudiante_db(payload: dict):
 
         conn.commit()
         return {"mensaje": "Estudiante guardado exitosamente", "id_estudiante": nuevo_id_est, "run": payload.get("run")}
+    except HTTPException:
+        # Errores de validación (422, etc.) se devuelven tal cual, no como 500.
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Error al guardar: {e}")
@@ -687,10 +811,23 @@ def _snapshot_ficha(cur, id_estudiante, id_apod_princ, id_apod_supl):
             "medico_tratante": s[6], "medicamento": s[7], "nee": s[8], "nee_tipo": s[9],
         }
 
+    c = None
+    if _tiene_columnas_correo(cur):
+        cur.execute(
+            "SELECT correo_personal, correo_institucional FROM estudiante WHERE id_estudiante = %s",
+            (id_estudiante,),
+        )
+        c = cur.fetchone()
+    contacto_estudiante = {
+        "correo_personal": c[0] if c else None,
+        "correo_institucional": c[1] if c else None,
+    }
+
     return {
         "apoderado_titular": datos_apoderado(id_apod_princ),
         "apoderado_suplente": datos_apoderado(id_apod_supl),
         "salud": salud,
+        "contacto_estudiante": contacto_estudiante,
     }
 
 
@@ -699,6 +836,7 @@ _ETIQUETA_SECCION = {
     "apoderado_titular": "Apoderado titular",
     "apoderado_suplente": "Apoderado suplente",
     "salud": "Ficha de salud",
+    "contacto_estudiante": "Correo del estudiante",
 }
 
 
@@ -736,7 +874,7 @@ def _registrar_auditoria_estudiante(cur, rut, id_usuario, dir_anterior, dir_nuev
     # 2. ¿Cambió apoderado/salud? (detalle de campos por sección)
     secciones_cambiadas = {}
     if snapshot_antes is not None and snapshot_despues is not None:
-        for sec in ("apoderado_titular", "apoderado_suplente", "salud"):
+        for sec in ("apoderado_titular", "apoderado_suplente", "salud", "contacto_estudiante"):
             campos = _comparar_seccion(snapshot_antes.get(sec), snapshot_despues.get(sec))
             if campos:
                 secciones_cambiadas[sec] = campos
@@ -830,10 +968,18 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
                        for k in ("calle", "numero", "sector", "comuna", "domicilio"))
 
         if usa_estructurado:
-            calle = (req.calle or "").strip() or None
-            numero = (req.numero or "").strip() or None
-            sector = (req.sector or "").strip() or None
-            comuna = (req.comuna or "").strip() or None
+            calle = " ".join((req.calle or "").split()) or None
+            numero = normalizar_numero_domicilio(req.numero)
+            sector = " ".join((req.sector or "").split()) or None
+            comuna = " ".join((req.comuna or "").split()) or None
+            # Misma regla que el frontend: calle, número y comuna son obligatorios
+            # (el sector/cerro es opcional; sin número se indica 'S/N').
+            if not (calle and numero and comuna):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Domicilio del estudiante incompleto: calle, número y comuna son obligatorios "
+                           "(use 'S/N' si el domicilio no tiene número).",
+                )
             domicilio_final = componer_domicilio(calle, numero, sector, comuna)
             cambio_geo = _dir_cambio_para_geo({
                 "calle": calle, "numero": numero, "sector": sector,
@@ -870,12 +1016,26 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
             domicilio_final = prev_dom
 
         dir_nueva = {
-            "calle": req.calle if usa_estructurado else dir_anterior["calle"],
-            "numero": req.numero if usa_estructurado else dir_anterior["numero"],
-            "sector": req.sector if usa_estructurado else dir_anterior["sector"],
-            "comuna": req.comuna if usa_estructurado else dir_anterior["comuna"],
+            "calle": calle if usa_estructurado else dir_anterior["calle"],
+            "numero": numero if usa_estructurado else dir_anterior["numero"],
+            "sector": sector if usa_estructurado else dir_anterior["sector"],
+            "comuna": comuna if usa_estructurado else dir_anterior["comuna"],
             "domicilio": domicilio_final,
         }
+
+        # 2b. Correo del estudiante (personal / institucional).
+        #     Formato: se valida siempre que se informe. Obligatoriedad: regla
+        #     parametrizada por nivel (reglas_estudiante.py), evaluada sobre el valor
+        #     final (el enviado o, si no se envía, el ya guardado).
+        nuevo_personal = getattr(req, "correo_personal", None)
+        nuevo_institucional = getattr(req, "correo_institucional", None)
+        validar_formato_correo(nuevo_personal, "El correo personal del estudiante")
+        validar_formato_correo(nuevo_institucional, "El correo institucional del estudiante")
+
+        # Sin la migración aplicada no hay dónde guardar el correo: se omite el bloque
+        # (no se exige ni se escribe) para no bloquear el guardado del resto de la ficha.
+        if _tiene_columnas_correo(cur):
+            _guardar_correo_estudiante(cur, id_estudiante, nuevo_personal, nuevo_institucional)
 
         try:
             cur.execute("UPDATE estudiante SET fecha_actualizacion = CURRENT_TIMESTAMP WHERE id_estudiante = %s", (id_estudiante,))
@@ -888,9 +1048,28 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
             nom_a = req.nombres_apoderado or "Apoderado"
             pat_a = req.apellido_paterno_apoderado or "Titular"
             mat_a = req.apellido_materno_apoderado or ""
-            dom_a = req.domicilio_apoderado or domicilio_final or "Sin registrar"
+            # Prioridad: domicilio desglosado enviado > texto enviado > el que ya tenía el
+            # apoderado > el del estudiante > 'Sin registrar'. Antes los campos desglosados se
+            # ignoraban y el domicilio del apoderado se pisaba con el del estudiante.
+            dom_a = (
+                componer_domicilio(
+                    getattr(req, "calle_apoderado", None), normalizar_numero_domicilio(getattr(req, "numero_apoderado", None)),
+                    getattr(req, "sector_apoderado", None), getattr(req, "comuna_apoderado", None),
+                )
+                or req.domicilio_apoderado
+                or _domicilio_guardado(cur, id_apod_princ)
+                or domicilio_final
+                or "Sin registrar"
+            )
             tel_a = req.telefono_apoderado or ""
             cor_a = req.correo_apoderado or ""
+
+            # Validación de parentesco (catálogo único; acepta el valor histórico ya guardado).
+            validar_parentesco(
+                getattr(req, "relacion_apoderado", None),
+                _relaciones_guardadas(cur, id_apoderado=id_apod_princ, rut=rut_nuevo),
+                "Parentesco del apoderado titular",
+            )
 
             rel_a = getattr(req, "relacion_apoderado", None)
             if not rel_a and id_apod_princ:
@@ -940,9 +1119,26 @@ def actualizar_datos_estudiante_db(rut: str, req, id_usuario: int, usuario_actua
             nom_s = req.nombres_suplente or "Apoderado"
             pat_s = req.apellido_paterno_suplente or "Suplente"
             mat_s = req.apellido_materno_suplente or ""
-            dom_s = req.domicilio_suplente or req.domicilio_apoderado or domicilio_final or "Sin registrar"
+            dom_s = (
+                componer_domicilio(
+                    getattr(req, "calle_suplente", None), normalizar_numero_domicilio(getattr(req, "numero_suplente", None)),
+                    getattr(req, "sector_suplente", None), getattr(req, "comuna_suplente", None),
+                )
+                or req.domicilio_suplente
+                or _domicilio_guardado(cur, id_apod_supl)
+                or req.domicilio_apoderado
+                or domicilio_final
+                or "Sin registrar"
+            )
             tel_s = req.telefono_suplente or ""
             cor_s = req.correo_suplente or ""
+
+            # Mismo catálogo y misma regla que el titular.
+            validar_parentesco(
+                getattr(req, "relacion_suplente", None),
+                _relaciones_guardadas(cur, id_apoderado=id_apod_supl, rut=rut_supl_norm),
+                "Parentesco del apoderado suplente",
+            )
 
             rel_s = getattr(req, "relacion_suplente", None)
             if not rel_s and id_apod_supl:

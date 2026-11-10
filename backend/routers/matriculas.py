@@ -9,6 +9,9 @@ import roles
 from services import matricula_service
 from services.matricula_service import exportar_matriculas_excel_service
 from services.storage_service import validar_tamano_archivo
+from services import libro_matricula_service
+from services.auditoria_exportacion_service import registrar_exportacion
+from datetime import datetime
 
 router = APIRouter(prefix="/matriculas", tags=["Matrículas"])
 
@@ -60,8 +63,9 @@ def crear_matricula(matricula: MatriculaCreate, usuario_actual: dict = Depends(v
             )
         matricula.id_establecimiento = id_est_usuario
 
-    # Inyectamos el ID del usuario directamente en el esquema si no viene (medida de seguridad)
-    if not matricula.id_usuario_ejecutor:
+    # El ejecutor SIEMPRE se toma de la sesión (JWT), nunca del cliente: la auditoría
+    # confía en este valor y un cliente podría falsear quién hizo el cambio.
+    if usuario_actual.get("id_usuario"):
         matricula.id_usuario_ejecutor = usuario_actual.get("id_usuario")
     return matricula_service.crear_nueva_matricula_db(matricula)
 
@@ -72,6 +76,9 @@ def actualizar_matricula(
     background_tasks: BackgroundTasks,
     usuario_actual: dict = Depends(verificar_escritura)
 ):
+    # El ejecutor se toma de la sesión (JWT), no del cuerpo enviado por el cliente.
+    if usuario_actual.get("id_usuario"):
+        matricula.id_usuario_ejecutor = usuario_actual.get("id_usuario")
     return matricula_service.actualizar_estado_matricula_db(id_matricula, matricula, usuario_actual, background_tasks=background_tasks)
 
 @router.put("/{id_matricula}/confirmar-renovacion")
@@ -177,6 +184,60 @@ def obtener_estudiantes_curso(
     establecimiento_id = validar_acceso_colegio(establecimiento_id, usuario_actual)
     return matricula_service.obtener_estudiantes_curso_db(establecimiento_id, anio, curso)
 
+@router.get("/libro")
+def exportar_libro_matricula(
+    formato: str = Query("pdf", pattern="^(pdf|xlsx)$"),
+    establecimiento_id: Optional[int] = None,
+    anio: Optional[int] = Query(None),
+    curso: Optional[str] = Query(None),
+    nivel: Optional[str] = Query(None),
+    modalidad: Optional[int] = Query(None, description="cod_tipo_ensenanza (plan/modalidad)"),
+    incluir_pendientes: bool = Query(False, description="Incluir pre-matrículas 'Por renovar'/'Pendiente firma'"),
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    """
+    Libro / Registro General de Matrícula (contenido mínimo Res. Exenta 0030/2021, punto 5.2),
+    en PDF o Excel. Se genera en el backend aplicando los permisos del usuario autenticado:
+    un usuario de colegio queda forzado a su establecimiento; el nivel central puede elegir
+    uno o exportar toda la red. Cada exportación queda registrada en auditoría.
+    """
+    establecimiento_id = validar_acceso_colegio(establecimiento_id, usuario_actual)
+
+    filas = libro_matricula_service.obtener_filas_libro(
+        id_establecimiento=establecimiento_id, anio=anio, curso=curso,
+        nivel=nivel, modalidad=modalidad, incluir_pendientes=incluir_pendientes,
+    )
+    meta = {
+        "establecimiento_texto": libro_matricula_service.texto_establecimiento(establecimiento_id),
+        "anio": anio, "curso": curso, "nivel": nivel, "modalidad": modalidad,
+        "incluir_pendientes": incluir_pendientes,
+        "emitido": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "usuario": usuario_actual.get("nombre") or usuario_actual.get("sub") or "",
+    }
+
+    if formato == "pdf":
+        buffer = libro_matricula_service.generar_pdf_libro(filas, meta)
+        media_type, extension = "application/pdf", "pdf"
+    else:
+        buffer = libro_matricula_service.generar_excel_libro(filas, meta)
+        media_type, extension = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"
+
+    registrar_exportacion(
+        usuario_actual, "libro_matricula", extension, establecimiento_id,
+        {"anio": anio, "curso": curso, "nivel": nivel, "modalidad": modalidad,
+         "incluir_pendientes": incluir_pendientes},
+        len(filas),
+    )
+
+    partes = ["Libro_Matricula"]
+    partes.append(f"Est{establecimiento_id}" if establecimiento_id else "RedSLEP")
+    if anio:
+        partes.append(str(anio))
+    nombre = "_".join(partes) + f".{extension}"
+    return StreamingResponse(buffer, media_type=media_type,
+                             headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
 @router.get("/exportar-excel")
 async def exportar_matriculas_excel(
     establecimiento_id: Optional[int] = None,
@@ -192,11 +253,18 @@ async def exportar_matriculas_excel(
     establecimiento_id = validar_acceso_colegio(establecimiento_id, usuario_actual)
 
     # Delegamos toda la lógica al servicio
+    contador: list = []
     buffer = exportar_matriculas_excel_service(
         id_establecimiento=establecimiento_id,
         anio=anio,
         codigo_plan=codigo_plan,
-        curso=curso
+        curso=curso,
+        contador=contador,
+    )
+    registrar_exportacion(
+        usuario_actual, "reporte_matriculas_completo", "xlsx", establecimiento_id,
+        {"anio": anio, "codigo_plan": codigo_plan, "curso": curso},
+        contador[0] if contador else 0,
     )
 
     # Nombre dinámico del archivo según alcance

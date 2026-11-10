@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, Query, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse, RedirectResponse
 
-from security import obtener_usuario_actual
+from security import obtener_usuario_actual, verificar_escritura
 
 # Importamos la capa de servicio
 from services import documento_service, matricula_service, estudiante_service, storage_service
@@ -21,8 +21,10 @@ class EmisionRequest(BaseModel):
 def emitir_documento(
     req: EmisionRequest, 
     background_tasks: BackgroundTasks,
-    usuario_actual: dict = Depends(obtener_usuario_actual)
+    usuario_actual: dict = Depends(verificar_escritura)
 ):
+    # Un usuario de colegio solo puede emitir documentos de matrículas de su establecimiento.
+    matricula_service.verificar_acceso_matricula_db(req.id_matricula, usuario_actual)
     return documento_service.emitir_documento_service(req.id_matricula, req.tipo_documento, req.destinatarios, background_tasks=background_tasks)
 
 @router.get("/verificar")

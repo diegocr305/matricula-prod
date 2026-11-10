@@ -1,4 +1,5 @@
 import React from 'react';
+import SelectParentesco from '../../../components/SelectParentesco';
 
 interface ModalFaltantesProps {
   isOpen: boolean;
@@ -62,6 +63,24 @@ export const ModalFaltantes: React.FC<ModalFaltantesProps> = ({
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors"
               />
             </div>
+            <div className="mt-3">
+              <label htmlFor="faltantes-correo-personal" className="block text-xs font-bold text-gray-700 mb-1">
+                Correo personal del estudiante{' '}
+                {formFaltantes.correo_personal_obligatorio
+                  ? <span className="text-red-500">*</span>
+                  : <span className="text-gray-400 font-normal">(opcional)</span>}
+              </label>
+              <input
+                id="faltantes-correo-personal"
+                type="email"
+                name="correo_personal"
+                value={formFaltantes.correo_personal || ''}
+                onChange={handleFaltantesChange}
+                required={Boolean(formFaltantes.correo_personal_obligatorio)}
+                placeholder="correo.personal@ejemplo.com"
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors"
+              />
+            </div>
           </div>
 
           {/* Sección Apoderado Titular */}
@@ -99,22 +118,13 @@ export const ModalFaltantes: React.FC<ModalFaltantesProps> = ({
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   Parentesco con el Estudiante <span className="text-red-500">*</span>
                 </label>
-                <select
+                <SelectParentesco
                   name="relacion_apoderado"
                   value={formFaltantes.relacion_apoderado || 'Madre'}
                   onChange={handleFaltantesChange}
                   required
                   className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white"
-                >
-                  <option value="Madre">Madre</option>
-                  <option value="Padre">Padre</option>
-                  <option value="Abuelo Paterno">Abuelo Paterno</option>
-                  <option value="Abuela Paterna">Abuela Paterna</option>
-                  <option value="Abuelo Materno">Abuelo Materno</option>
-                  <option value="Abuela Materna">Abuela Materna</option>
-                  <option value="Tutor Legal Designado">Tutor Legal Designado</option>
-                  <option value="Otro">Otro</option>
-                </select>
+                />
               </div>
 
               <div>
@@ -247,12 +257,11 @@ export const ModalFaltantes: React.FC<ModalFaltantesProps> = ({
                   <label className="block text-xs font-bold text-gray-700 mb-1">
                     Parentesco Suplente
                   </label>
-                  <input
-                    type="text"
+                  <SelectParentesco
                     name="relacion_suplente"
                     value={formFaltantes.relacion_suplente || ''}
                     onChange={handleFaltantesChange}
-                    placeholder="Ej: Tía, Hermano mayor, Abuelo..."
+                    placeholder="Seleccione parentesco..."
                     className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                 </div>

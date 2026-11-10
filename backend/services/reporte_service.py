@@ -30,9 +30,10 @@ def clasificar_evento(accion: str, datos_ant: any, datos_nuev: any) -> tuple[str
         if nuev.get('motivo_retiro') == 'Respuesta Apoderado (Confidencial)' and ant.get('motivo_retiro') != 'Respuesta Apoderado (Confidencial)':
             return 'CUESTIONARIO', 'El apoderado completó el cuestionario de retiro confidencial.'
 
-        # 3. Cambio de curso
-        if nuev.get('id_curso') and ant.get('id_curso') and nuev.get('id_curso') != ant.get('id_curso'):
-            return 'CAMBIO_CURSO', f"Cambio de curso realizado: Curso #{ant.get('id_curso')} ➔ Curso #{nuev.get('id_curso')}"
+        # 3. Cambio de curso. La tabla 'matricula' guarda el curso en la columna 'curso'
+        #    (no existe 'id_curso'; antes este evento nunca se detectaba).
+        if nuev.get('curso') and ant.get('curso') and nuev.get('curso') != ant.get('curso'):
+            return 'CAMBIO_CURSO', f"Cambio de curso realizado: {ant.get('curso')} ➔ {nuev.get('curso')}"
 
         # 4. Actualización general de datos
         campos_modificados = []
@@ -98,12 +99,12 @@ def obtener_auditoria_matriculas_db(establecimiento_id: int, tipo_movimiento: st
             elif tipo == 'CUESTIONARIO':
                 query += " AND (a.datos_nuevos->>'motivo_retiro' = 'Respuesta Apoderado (Confidencial)') AND (a.datos_anteriores->>'motivo_retiro' IS NULL OR a.datos_anteriores->>'motivo_retiro' != 'Respuesta Apoderado (Confidencial)')"
             elif tipo == 'CAMBIO_CURSO':
-                query += " AND a.accion = 'UPDATE' AND (a.datos_nuevos->>'id_curso' IS NOT NULL) AND (a.datos_anteriores->>'id_curso' IS NOT NULL) AND (a.datos_nuevos->>'id_curso' != a.datos_anteriores->>'id_curso')"
+                query += " AND a.accion = 'UPDATE' AND (a.datos_nuevos->>'curso' IS NOT NULL) AND (a.datos_anteriores->>'curso' IS NOT NULL) AND (a.datos_nuevos->>'curso' != a.datos_anteriores->>'curso')"
             elif tipo == 'ACTUALIZACION':
                 query += """ AND a.accion = 'UPDATE' 
                     AND NOT (a.datos_nuevos->>'estado' = 'Retirado' AND (a.datos_anteriores->>'estado' IS NULL OR a.datos_anteriores->>'estado' != 'Retirado'))
                     AND NOT (a.datos_nuevos->>'motivo_retiro' = 'Respuesta Apoderado (Confidencial)' AND (a.datos_anteriores->>'motivo_retiro' IS NULL OR a.datos_anteriores->>'motivo_retiro' != 'Respuesta Apoderado (Confidencial)'))
-                    AND NOT ((a.datos_nuevos->>'id_curso' IS NOT NULL) AND (a.datos_anteriores->>'id_curso' IS NOT NULL) AND (a.datos_nuevos->>'id_curso' != a.datos_anteriores->>'id_curso'))"""
+                    AND NOT ((a.datos_nuevos->>'curso' IS NOT NULL) AND (a.datos_anteriores->>'curso' IS NOT NULL) AND (a.datos_nuevos->>'curso' != a.datos_anteriores->>'curso'))"""
 
         query += " ORDER BY a.fecha_accion DESC LIMIT 300"
 

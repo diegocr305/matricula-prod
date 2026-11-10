@@ -149,6 +149,10 @@ def descargar_comprobante_ingreso_service(rut: str, usuario_actual: dict):
         cur.close()
         conn.close()
 
+    # Un usuario de colegio solo descarga comprobantes de matrículas de su establecimiento.
+    from services.matricula_service import verificar_acceso_matricula_db
+    verificar_acceso_matricula_db(id_matricula_reciente, usuario_actual)
+
     datos_alumno = obtener_datos_bd(id_matricula_reciente)
     if not datos_alumno: 
         raise HTTPException(status_code=404, detail="Error al extraer los datos de la matrícula.")

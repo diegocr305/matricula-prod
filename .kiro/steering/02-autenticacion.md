@@ -61,11 +61,12 @@ sueltas en routers/hooks; usar los helpers (`es_slep`, `puede_escribir`,
 
 ## Accesos otorgados (oct 2026, correo del jefe)
 Los 11 correos son del **RBD 1520** (id_establecimiento=17), en `acceso_establecimiento`.
-**NADIE quedó como `admin_slep`**: "administrador" aquí significa administrador del
-colegio (rol `Colegio`), no del nivel central SLEP.
-- **Colegio** (admin del colegio, ve todo lo del 1520): tamar.rubina, analia.torres,
-  yasna.diaz, carolina.conchap (esta última es la Directora).
-- **Matriculador** (solo Matrículas + Estudiantes del 1520): araceli.contreras,
+**NADIE quedó como `admin_slep`**: el rol `Colegio` corresponde a la dirección /
+directivos del establecimiento (NO se llama "Administrador"; ese término queda solo para
+`admin_slep`, el nivel central SLEP).
+- **Colegio** (director/a o directivo del establecimiento, ve todo lo del 1520): tamar.rubina,
+  analia.torres, yasna.diaz, carolina.conchap (esta última es la Directora).
+- **Matriculador** (solo Admisión Escolar + Estudiantes del 1520): araceli.contreras,
   daniela.aguilera, marta.villegas, angelica.zamora, mauricio.montero, maria.guerra,
   daniel.gajardo.
 - Historial: en el primer alta se interpretaron invertidos y como SLEP; se corrigió a

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertOctagon, CheckCircle2, Users, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import ModalEmisionDocumento from '../../components/ModalEmisionDocumento';
 import ModalDescargaExcel from './components/ModalDescargaExcel';
+import ModalLibroMatricula from './components/ModalLibroMatricula';
 import ModalDetalleMotivo from './components/ModalDetalleMotivo';
 import { useMatriculas } from './hooks/useMatriculas'; 
 import { API_BASE_URL } from '../../config/api';
@@ -37,6 +38,7 @@ export default function Matriculas() {
     modalExcelAbierto, setModalExcelAbierto,
     page, setPage, totalPages, total,
   } = useMatriculas();
+  const [modalLibroAbierto, setModalLibroAbierto] = React.useState(false);
 
   const [mostrarListaDestino, setMostrarListaDestino] = useState(false);
   const [modalDetalleMotivoAbierto, setModalDetalleMotivoAbierto] = useState(false);
@@ -158,7 +160,7 @@ export default function Matriculas() {
     <div className="space-y-6 relative">
       
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Registro de Matrículas</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Admisión Escolar</h1>
         <div className="flex flex-wrap gap-3">
           <button 
             onClick={() => setModalExcelAbierto(true)}
@@ -170,6 +172,12 @@ export default function Matriculas() {
             }`}
           >
             Descargar Excel
+          </button>
+          <button
+            onClick={() => setModalLibroAbierto(true)}
+            className="flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors border bg-white text-[#25306B] border-[#25306B] hover:bg-blue-50"
+          >
+            Libro de Matrícula
           </button>
           {puedeEditar && (
             <>
@@ -852,6 +860,12 @@ export default function Matriculas() {
           tipoDocumento={datosEmision.tipo}
         />
       )}
+
+      <ModalLibroMatricula
+        abierto={modalLibroAbierto}
+        onCerrar={() => setModalLibroAbierto(false)}
+        colegioSeleccionado={colegioSeleccionado || ''}
+      />
 
       <ModalDescargaExcel
         abierto={modalExcelAbierto}

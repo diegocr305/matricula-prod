@@ -50,7 +50,7 @@ export default function Layout() {
               <Home size={18} /> Inicio
             </Link>
             <Link to="/matriculas" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/matriculas') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
-              <FolderOpen size={18} /> Matrículas
+              <FolderOpen size={18} /> Admisión Escolar
             </Link>
             <Link to="/estudiantes" className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${isActive('/estudiantes') ? 'bg-[#006BB9] text-white shadow-inner border-b-2 border-[#FF1D3D]' : 'text-blue-200 hover:bg-[#006BB9] hover:text-white border-b-2 border-transparent'}`}>
               <Users size={18} /> Estudiantes

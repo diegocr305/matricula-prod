@@ -8,6 +8,8 @@ import {
 import { useEstudiantes } from './hooks/useEstudiantes'; 
 import { API_BASE_URL } from '../../config/api';
 import ModalDetalleMotivo from '../matriculas/components/ModalDetalleMotivo';
+import SelectParentesco from '../../components/SelectParentesco';
+import { PARENTESCO_REQUIERE_DOCUMENTO } from '../../config/parentescos';
 
 export default function Estudiantes() {
   const {
@@ -324,23 +326,15 @@ export default function Estudiantes() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/50 p-5 rounded-xl border border-emerald-100">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Parentesco con el Estudiante <span className="text-red-500">*</span></label>
-                      <select 
-                        required value={nuevoEstudiante.relacion_estudiante} 
-                        onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, relacion_estudiante: e.target.value})} 
+                      <SelectParentesco
+                        required value={nuevoEstudiante.relacion_estudiante}
+                        onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, relacion_estudiante: e.target.value})}
                         className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white"
-                      >
-                        <option value="">Seleccione parentesco...</option>
-                        <option value="Madre">Madre</option>
-                        <option value="Padre">Padre</option>
-                        <option value="Abuelo Paterno">Abuelo Paterno</option>
-                        <option value="Abuela Paterna">Abuela Paterna</option>
-                        <option value="Abuelo Materno">Abuelo Materno</option>
-                        <option value="Abuela Materna">Abuela Materna</option>
-                        <option value="Tutor Legal Designado">Tutor Legal Designado (Medida Judicial/Proteccional)</option>
-                      </select>
+                        placeholder="Seleccione parentesco..."
+                      />
                     </div>
 
-                    {nuevoEstudiante.relacion_estudiante === 'Tutor Legal Designado' && (
+                    {nuevoEstudiante.relacion_estudiante === PARENTESCO_REQUIERE_DOCUMENTO && (
                       <div className="md:col-span-2 bg-orange-50 border border-orange-200 p-4 rounded-xl">
                         <label className="block text-xs font-bold text-orange-900 mb-2">Adjuntar Resolución Judicial / Notarial de Tutoría (PDF) <span className="text-red-500">*</span></label>
                         <input required={!archivoTutor} type="file" accept=".pdf" onChange={(e) => setArchivoTutor(e.target.files?.[0] || null)} className="text-sm" />
@@ -430,7 +424,7 @@ export default function Estudiantes() {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Parentesco / Relación</label>
-                        <input type="text" placeholder="Ej: Tía, Hermano mayor, etc." value={nuevoEstudiante.relacion_suplente} onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, relacion_suplente: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
+                        <SelectParentesco value={nuevoEstudiante.relacion_suplente} onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, relacion_suplente: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" placeholder="Seleccione parentesco..." />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Nombres <span className="text-red-500">*</span></label>
@@ -894,6 +888,23 @@ export default function Estudiantes() {
                     </div>
                   )}
                   
+                  {!modoEdicion && (
+                    <div className="pt-2 border-t border-gray-50 grid grid-cols-1 gap-2">
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase">
+                          Correo personal{datosEstudiante.personal?.correo_personal_obligatorio ? ' (obligatorio 4° medio)' : ''}
+                        </p>
+                        <p className={`font-medium text-sm ${datosEstudiante.personal?.correo_personal ? 'text-gray-800' : (datosEstudiante.personal?.correo_personal_obligatorio ? 'text-red-600' : 'text-gray-400')}`}>
+                          {datosEstudiante.personal?.correo_personal || 'Sin registrar'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase">Correo institucional</p>
+                        <p className="font-medium text-sm text-gray-800">{datosEstudiante.personal?.correo_institucional || <span className="text-gray-400">Sin registrar</span>}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t border-gray-50">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-1">Última Matrícula Registrada</p>
                     <p className="font-bold text-blue-800">{ultimaMatricula ? ultimaMatricula.establecimiento : 'Sin registro'}</p>
@@ -970,6 +981,35 @@ export default function Estudiantes() {
                             value={datosEdicion.comuna || ''} 
                             onChange={(e) => setDatosEdicion({...datosEdicion, comuna: e.target.value})} 
                             className="w-full border border-blue-300 bg-blue-50/50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium" 
+                          />
+                        </div>
+                        <div className="pt-2 border-t border-blue-100">
+                          <label htmlFor="edit-correo-personal" className="block text-xs font-medium text-gray-500 mb-1">
+                            Correo personal del estudiante{' '}
+                            {datosEstudiante.personal?.correo_personal_obligatorio
+                              ? <span className="text-red-500">*</span>
+                              : <span className="text-gray-400">(opcional)</span>}
+                          </label>
+                          <input
+                            id="edit-correo-personal"
+                            type="email"
+                            placeholder="correo.personal@ejemplo.com"
+                            value={datosEdicion.correo_personal || ''}
+                            onChange={(e) => setDatosEdicion({...datosEdicion, correo_personal: e.target.value})}
+                            className="w-full border border-blue-300 bg-blue-50/50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="edit-correo-institucional" className="block text-xs font-medium text-gray-500 mb-1">
+                            Correo institucional <span className="text-gray-400">(opcional)</span>
+                          </label>
+                          <input
+                            id="edit-correo-institucional"
+                            type="email"
+                            placeholder="correo entregado por el establecimiento"
+                            value={datosEdicion.correo_institucional || ''}
+                            onChange={(e) => setDatosEdicion({...datosEdicion, correo_institucional: e.target.value})}
+                            className="w-full border border-blue-300 bg-blue-50/50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                           />
                         </div>
                       </div>
@@ -1320,16 +1360,7 @@ export default function Estudiantes() {
                       )}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Parentesco <span className="text-red-500">*</span></label>
-                        <select value={datosEdicion.relacion_apoderado || 'Madre'} onChange={(e) => setDatosEdicion({...datosEdicion, relacion_apoderado: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                          <option value="Madre">Madre</option>
-                          <option value="Padre">Padre</option>
-                          <option value="Abuelo Paterno">Abuelo Paterno</option>
-                          <option value="Abuela Paterna">Abuela Paterna</option>
-                          <option value="Abuelo Materno">Abuelo Materno</option>
-                          <option value="Abuela Materna">Abuela Materna</option>
-                          <option value="Tutor Legal Designado">Tutor Legal Designado</option>
-                          <option value="Otro">Otro</option>
-                        </select>
+                        <SelectParentesco value={datosEdicion.relacion_apoderado || 'Madre'} onChange={(e) => setDatosEdicion({...datosEdicion, relacion_apoderado: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Nombres <span className="text-red-500">*</span></label>
@@ -1404,7 +1435,7 @@ export default function Estudiantes() {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-gray-700 mb-1">Parentesco</label>
-                          <input type="text" value={datosEdicion.relacion_suplente || ''} onChange={(e) => setDatosEdicion({...datosEdicion, relacion_suplente: e.target.value})} placeholder="Ej: Tía, Hermano mayor..." className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" />
+                          <SelectParentesco value={datosEdicion.relacion_suplente || ''} onChange={(e) => setDatosEdicion({...datosEdicion, relacion_suplente: e.target.value})} placeholder="Seleccione parentesco..." className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-gray-700 mb-1">Nombres <span className="text-red-500">*</span></label>
